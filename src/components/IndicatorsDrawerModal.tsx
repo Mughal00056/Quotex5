@@ -274,6 +274,53 @@ export const IndicatorsDrawerModal: React.FC<IndicatorsDrawerModalProps> = ({
 
                   <button
                     onClick={() => {
+                      setActiveDrawingTool('crosshair');
+                      onClose();
+                    }}
+                    className="py-2 px-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-cyan-400 stroke-[3]" />
+                    <span>+ 4-Line Crosshair</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const p1 = Number(
+                        (activeAsset.currentPrice - activeAsset.volatility * 0.7).toFixed(activeAsset.decimalPlaces)
+                      );
+                      const p2 = Number(
+                        (activeAsset.currentPrice + activeAsset.volatility * 0.7).toFixed(activeAsset.decimalPlaces)
+                      );
+                      const offset = Number((-activeAsset.volatility * 0.55).toFixed(activeAsset.decimalPlaces));
+                      const now = Date.now();
+                      const t1 = now - 60 * 1000 * 9;
+                      const t2 = now - 60 * 1000 * 1;
+                      addDrawnLine({
+                        type: 'channel',
+                        price1: p1,
+                        price2: p2,
+                        price3: offset,
+                        time1: t1,
+                        time2: t2,
+                        points: [
+                          { time: t1, price: p1 },
+                          { time: t2, price: p2 },
+                          { time: t2, price: Number((p2 + offset).toFixed(activeAsset.decimalPlaces)) },
+                          { time: t1, price: Number((p1 + offset).toFixed(activeAsset.decimalPlaces)) }
+                        ],
+                        color: selectedColor,
+                        lineWidth: 2,
+                        label: '4-DOT SHAPE'
+                      });
+                    }}
+                    className="py-2 px-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <PenTool className="w-3.5 h-3.5 text-amber-400" />
+                    <span>+ Custom Shape (4 Dots)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
                       const price1 = Number(
                         (activeAsset.currentPrice + activeAsset.volatility * 1.2).toFixed(activeAsset.decimalPlaces)
                       );
@@ -294,7 +341,7 @@ export const IndicatorsDrawerModal: React.FC<IndicatorsDrawerModalProps> = ({
                     className="py-2 px-2.5 rounded-xl bg-[#231a36] hover:bg-[#2f2249] border border-[#a855f7]/40 text-[#c084fc] font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Square className="w-3.5 h-3.5 text-purple-400" />
-                    <span>+ Square Zone</span>
+                    <span>+ Zone Box (4 Dots)</span>
                   </button>
                 </div>
 

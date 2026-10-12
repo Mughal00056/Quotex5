@@ -184,14 +184,15 @@ export type WatermarkType = 'both' | 'logo' | 'text';
 
 export type DrawingToolType = 
   | 'none' 
+  | 'crosshair'
+  | 'channel'
   | 'horizontal' 
   | 'vertical' 
   | 'trendline' 
   | 'ray' 
   | 'freehand' 
   | 'rectangle' 
-  | 'fibonacci' 
-  | 'channel';
+  | 'fibonacci';
 
 export interface DrawnLine {
   id: string;
@@ -200,9 +201,11 @@ export interface DrawnLine {
   time1?: number;
   price2?: number;
   time2?: number;
-  price3?: number; // for channel
+  price3?: number; // for parallel channel / tilted rectangle thickness (price offset from line 1-2)
   points?: { time: number; price: number }[];
   color: string;
+  lineWidth?: number;
+  visible?: boolean; // per-shape Eye button toggle (hide/show while still able to draw)
   label?: string;
 }
 

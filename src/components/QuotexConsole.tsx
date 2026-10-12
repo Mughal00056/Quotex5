@@ -62,13 +62,9 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
   const secondsElapsedInCandle = Math.floor(nowTimestamp / 1000) % 60;
 
   // Compute target close time for 'TIME' / 1m candle mode:
-  // - Before 30s elapsed (e.g. at 00:45 remaining): stays at 45s (closes at current candle end)
-  // - After 30s elapsed (< 00:30 remaining): becomes full 60s!
+  // Displayed timer/clock stays unchanged ("Timing na change ho fix in trade ma 30 sec ka bad jab hum trade lagaya tu time wohi raha but trade only trade 60sec ok")
   const getTargetTimeForOffset = (offsetMinutes: number) => {
     const nextMinute = Math.ceil(nowTimestamp / 60000) * 60000;
-    if (offsetMinutes === 1) {
-      return secondsElapsedInCandle >= 30 ? nowTimestamp + 60000 : nextMinute;
-    }
     return nextMinute + (offsetMinutes - 1) * 60000;
   };
 
@@ -78,10 +74,7 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
     .getMinutes()
     .toString()
     .padStart(2, '0')}:00`;
-  const timeRemainingSeconds =
-    secondsElapsedInCandle >= 30 && timeOffsetMinutes === 1
-      ? 60
-      : Math.max(1, Math.ceil((currentTargetTimestamp - nowTimestamp) / 1000));
+  const timeRemainingSeconds = Math.max(1, Math.ceil((currentTargetTimestamp - nowTimestamp) / 1000));
 
   // Calculate current trade dollar amount
   const effectiveInvestment = isPercentMode

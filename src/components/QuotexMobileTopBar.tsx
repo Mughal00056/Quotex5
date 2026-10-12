@@ -601,16 +601,7 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      onClick={() => {
-                        removeRealMoney();
-                        setAccountType('REAL');
-                      }}
-                      className="py-2 px-2.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/60 border border-rose-500/40 text-rose-300 font-bold text-[11px] cursor-pointer"
-                    >
-                      Reset Live ($0.00)
-                    </button>
+                  <div className="grid grid-cols-1 gap-1.5">
                     <button
                       onClick={() => {
                         setRealBalanceDirect(105000);
@@ -985,12 +976,14 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                   <div className="grid grid-cols-3 gap-1.5">
                     {(
                       [
+                        { id: 'crosshair', label: '+ 4-Line Crosshair' },
+                        { id: 'channel', label: 'Custom Shape (4 Dots)' },
+                        { id: 'rectangle', label: 'Box (4 Dots)' },
                         { id: 'trendline', label: 'Trend Line' },
                         { id: 'horizontal', label: 'Support/Res' },
                         { id: 'vertical', label: 'Vertical' },
                         { id: 'ray', label: 'Ray Line' },
                         { id: 'freehand', label: 'Free Pen' },
-                        { id: 'rectangle', label: 'Square Box' },
                         { id: 'fibonacci', label: 'Fibonacci' }
                       ] as const
                     ).map((t) => (

@@ -79,10 +79,21 @@ export const TradingSidebar: React.FC<TradingSidebarProps> = ({ onOpenHistory })
       return;
     }
     setErrorMessage(null);
-    const effectiveDuration =
-      expirationMode === 'time'
-        ? Math.max(5, Math.ceil((targetTimestamp - Date.now()) / 1000))
-        : durationSeconds;
+    const now = Date.now();
+    const elapsedSec = Math.floor(now / 1000) % 60;
+    const remainingInCurrentCandle = 60 - elapsedSec;
+
+    let effectiveDuration = durationSeconds;
+    if (expirationMode === 'time') {
+      effectiveDuration =
+        timeOffsetMinutes === 1
+          ? elapsedSec >= 30
+            ? 60
+            : remainingInCurrentCandle
+          : Math.max(5, Math.ceil((targetTimestamp - now) / 1000));
+    } else if (durationSeconds === 60 || durationSeconds === 30) {
+      effectiveDuration = elapsedSec >= 30 ? 60 : remainingInCurrentCandle;
+    }
     const success = placeTrade(direction, investmentAmount, effectiveDuration);
     if (!success) {
       setErrorMessage('Failed to place trade. Check your balance.');

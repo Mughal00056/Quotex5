@@ -58,6 +58,8 @@ interface TradingContextType {
   setActiveDrawingTool: (tool: DrawingToolType) => void;
   drawingColor: string;
   setDrawingColor: (color: string) => void;
+  drawingStrokeWidth: number;
+  setDrawingStrokeWidth: (width: number) => void;
 
   // UI & Visibility Toggles (Individual ON/OFF Feature Controls)
   showChartButtons: boolean;
@@ -574,6 +576,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
   const [activeDrawingTool, setActiveDrawingTool] = useState<DrawingToolType>('none');
   const [drawingColor, setDrawingColor] = useState<string>('#eab308');
+  const [drawingStrokeWidth, setDrawingStrokeWidth] = useState<number>(2);
 
   const addDrawnLine = useCallback((line: Omit<DrawnLine, 'id'>) => {
     const newLine: DrawnLine = {
@@ -1291,6 +1294,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setActiveDrawingTool,
         drawingColor,
         setDrawingColor,
+        drawingStrokeWidth,
+        setDrawingStrokeWidth,
         showChartButtons,
         setShowChartButtons,
         showEyeButton,
