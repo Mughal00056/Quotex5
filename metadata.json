@@ -1,0 +1,6 @@
+{
+  "name": "Quotex Pro Trading Platform",
+  "description": "Professional binary options trading platform with real-time candlestick charts, technical indicators, account management, and trading tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
