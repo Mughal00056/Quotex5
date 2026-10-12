@@ -186,7 +186,7 @@ const STORAGE_KEYS = {
   WATERMARK_SIZE: 'quotex_watermark_size',
   WATERMARK_OPACITY: 'quotex_watermark_opacity',
   WATERMARK_TYPE: 'quotex_watermark_type',
-  ACTIVE_INDICATOR_IDS: 'quotex_active_indicator_ids',
+  ACTIVE_INDICATOR_IDS: 'quotex_active_indicator_ids_v3',
 };
 
 export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -247,13 +247,13 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem(STORAGE_KEYS.WATERMARK_TYPE, type);
   }, []);
 
-  // 100+ Indicators (Only Lines)
+  // 100+ Indicators (Only Lines) — Empty by default so no indicators are pre-applied on chart start
   const [activeIndicatorIds, setActiveIndicatorIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_INDICATOR_IDS);
-      return saved ? JSON.parse(saved) : ['sma_10', 'ema_20'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['sma_10', 'ema_20'];
+      return [];
     }
   });
 
@@ -612,21 +612,21 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.removeItem(STORAGE_KEYS.DRAWN_LINES);
   }, []);
 
-  // Zoom Controls ("fix candle ko hum fully zoom kara ok fix")
-  const [zoomVisibleCount, setZoomVisibleCount] = useState<number>(42);
+  // Zoom Controls ("trade bar ko hum trade fully zoom kar saka fix")
+  const [zoomVisibleCount, setZoomVisibleCount] = useState<number>(18);
 
   const zoomIn = useCallback(() => {
-    // Allows full zoom-in down to 5 candles so candles appear huge & clear
-    setZoomVisibleCount((prev) => Math.max(5, prev - 4));
+    // Allows full zoom-in down to 2 candles so trade bars appear huge & clear
+    setZoomVisibleCount((prev) => Math.max(2, Math.floor(prev * 0.78)));
   }, []);
 
   const zoomOut = useCallback(() => {
-    // Allows zoom-out up to 160 candles for broad view
-    setZoomVisibleCount((prev) => Math.min(160, prev + 5));
+    // Allows full zoom-out up to 180 candles for broad view
+    setZoomVisibleCount((prev) => Math.min(180, Math.ceil(prev * 1.25)));
   }, []);
 
   const resetZoom = useCallback(() => {
-    setZoomVisibleCount(42);
+    setZoomVisibleCount(18);
   }, []);
 
   // 8. Cashier History
@@ -1042,6 +1042,15 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     return () => clearInterval(interval);
   }, [activeAsset.decimalPlaces]);
+
+  // Guarantee RESULT (P/F) automatically closes after 5 seconds ("Result p/f 5 second bad band ho hod ok fix")
+  useEffect(() => {
+    if (!lastClosedTrade) return;
+    const timer = setTimeout(() => {
+      setLastClosedTrade(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [lastClosedTrade]);
 
   // Place Trade Action: Does NOT change candle timing or trade timer!
   const placeTrade = useCallback(

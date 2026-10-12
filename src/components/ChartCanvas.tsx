@@ -168,12 +168,12 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
     chartHeight: number;
   }>({ x: 220, y: 180, chartWidth: 360, chartHeight: 360 });
 
-  // Auto-dismiss lastClosedTrade after 7 seconds
+  // Auto-dismiss lastClosedTrade after 5 seconds ("Result p/f 5 second bad band ho hod ok fix")
   useEffect(() => {
     if (!lastClosedTrade) return;
     const timer = setTimeout(() => {
       clearLastClosedTrade();
-    }, 7000);
+    }, 5000);
     return () => clearTimeout(timer);
   }, [lastClosedTrade, clearLastClosedTrade]);
 
@@ -336,9 +336,9 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
     const latestCandle = displayCandles[latestCandleIndex];
     const timeframeMs = 60 * 1000;
 
-    // Responsive candle sizing based on zoomVisibleCount
-    const candleWidth = Math.max(4.5, (chartWidth * 0.72) / zoomVisibleCount);
-    const bodyWidth = Math.max(3, candleWidth * 0.68);
+    // Responsive candle sizing based on zoomVisibleCount (supports full zoom from 2 huge bars to 180 compact bars)
+    const candleWidth = Math.max(2.5, Math.min(95, (chartWidth * 0.72) / Math.max(2, zoomVisibleCount)));
+    const bodyWidth = Math.max(2, candleWidth * 0.72);
 
     // Default live candle is placed at ~64% of chartWidth (matching Quotex mobile screenshot)
     const defaultLiveX = Math.round(chartWidth * 0.64);
@@ -698,33 +698,26 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       });
     }
 
-    // 6. Vertical Lines: Beginning of trade (at actual live candle) & End of trade (to the right)
-    const endX = liveCandleX + candleWidth * 3.2;
+    // 6. Vertical Lines: Beginning of trade (dashed white line at live candle) & End of trade (to the right) matching screenshot
+    const endX = Math.min(chartWidth - 28, liveCandleX + Math.max(44, candleWidth * 2.4));
 
     // Only draw "Beginning of trade" if live candle is within current screen view
     if (liveCandleX >= -10 && liveCandleX <= chartWidth + 10) {
       ctx.save();
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 5]);
       ctx.beginPath();
       ctx.moveTo(liveCandleX, topPadding);
       ctx.lineTo(liveCandleX, topPadding + chartHeight);
       ctx.stroke();
 
-      const latestCandleTime = latestCandle.time;
-      const fixedDate = new Date(latestCandleTime);
-      const fixedTimeStr = `${fixedDate.getHours().toString().padStart(2, '0')}:${fixedDate
-        .getMinutes()
-        .toString()
-        .padStart(2, '0')}:00`;
-
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '10px "Plus Jakarta Sans", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(fixedTimeStr, liveCandleX - 65, topPadding + 9);
+      ctx.setLineDash([]);
       ctx.fillStyle = '#64748b';
-      ctx.fillText('Beginning of trade', liveCandleX - 65, topPadding + 22);
+      ctx.font = '10px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('▶', liveCandleX - 6, topPadding + 10);
+      ctx.fillText('Beginning of trade', liveCandleX - 6, topPadding + 23);
       ctx.restore();
     }
 
@@ -742,8 +735,8 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       ctx.fillStyle = '#64748b';
       ctx.font = '10px "Plus Jakarta Sans", sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('◀', endX + 4, topPadding + 9);
-      ctx.fillText('End of trade', endX + 4, topPadding + 22);
+      ctx.fillText('◀', endX + 5, topPadding + 10);
+      ctx.fillText('End of trade', endX + 5, topPadding + 23);
       ctx.restore();
     }
 
@@ -994,76 +987,75 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       renderLineItem({ ...draftLine, color: drawingColor }, true);
     }
 
-    // 9. Active Trades Strike Lines & Anchored Candle Markers (Never disappear when panning like Quotex)
-    activeTrades.forEach((trade) => {
-      if (trade.assetId !== activeAsset.id) return;
+    // 9. Active Trades Strike Lines & Circular Arrow Badges ONLY ("is tera show ho ok na timer na amount only arrow ok")
+    const assetTrades = activeTrades.filter((t) => t.assetId === activeAsset.id);
+    assetTrades.forEach((trade, idx) => {
       const tradeY = getY(trade.entryPrice);
       const isUp = trade.direction === 'UP';
-      const color = isUp ? '#10b981' : '#ef4444';
-      const remSec = Math.max(0, Math.ceil((trade.closeTime - Date.now()) / 1000));
+      const color = isUp ? '#10b981' : '#ff5733';
 
-      const tradeX = getXFromTime(trade.candleTime || latestCandle.time);
-      const tradeEndX = getXFromTime(trade.closeTime);
+      // Position arrow circles neatly along the horizontal trade line to the left of liveCandleX
+      // matching Capture+_2026-10-12-09-03-37.png (no timer, no amount, ONLY arrow inside circle)
+      const spacing = 17;
+      const circleX = Math.max(14, liveCandleX - 18 - idx * spacing);
 
       ctx.save();
-      // Persistent strike line spanning entire visible chart width
+
+      // Solid horizontal strike line from the arrow circle through liveCandleX to End of trade (endX)
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.6;
-      ctx.setLineDash([5, 4]);
+      ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.moveTo(0, tradeY);
-      ctx.lineTo(chartWidth, tradeY);
+      ctx.moveTo(circleX, tradeY);
+      ctx.lineTo(Math.max(liveCandleX + 24, endX), tradeY);
       ctx.stroke();
 
-      // If trade placement candle is within view, draw clean entry tag with live countdown (NO green or red dot on the candle bar)
-      if (tradeX >= -10 && tradeX <= chartWidth + 10) {
-        const tagW = 84;
-        const tagH = 18;
-        const tagX = Math.max(6, Math.min(chartWidth - tagW - 6, tradeX - tagW / 2));
-        const tagY = tradeY - (isUp ? 22 : -4);
-
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.roundRect(tagX, tagY, tagW, tagH, 4);
-        ctx.fill();
+      // Small white-filled circle with colored border right at (liveCandleX, tradeY) on the vertical dashed line
+      if (liveCandleX >= 0 && liveCandleX <= chartWidth) {
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${isUp ? '▲' : '▼'} $${trade.amount} • ${remSec}s`, tagX + tagW / 2, tagY + 12.5);
-      }
-
-      // If trade expiration vertical line is within view
-      if (tradeEndX >= 0 && tradeEndX <= chartWidth) {
-        ctx.strokeStyle = color + '99';
-        ctx.lineWidth = 1.2;
-        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(tradeEndX, topPadding);
-        ctx.lineTo(tradeEndX, topPadding + chartHeight);
+        ctx.arc(liveCandleX, tradeY, 4.5, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
-
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.roundRect(tradeEndX - 22, topPadding + 4, 44, 15, 4);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 9px "JetBrains Mono", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${remSec}s`, tradeEndX, topPadding + 14);
       }
 
-      // QUOTEX STYLE: When user pans backwards into past candles, future active trades ALWAYS stay visible (without any dot)
-      if (panOffset > 0 || tradeX > chartWidth - 10 || tradeX < 10) {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.roundRect(chartWidth - 92, tradeY - 10, 88, 20, 5);
-        ctx.fill();
+      // Circular badge with ONLY the arrow inside (no timer, no dollar amount)
+      const r = 8;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(circleX, tradeY, r, 0, Math.PI * 2);
+      ctx.fill();
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${isUp ? '▲' : '▼'} $${trade.amount} (${remSec}s)`, chartWidth - 48, tradeY + 3.5);
+      // Subtle outer ring on the arrow badge
+      ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Crisp white arrow (↑ for UP, ↓ for DOWN) inside the circle
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      if (isUp) {
+        // Up arrow ↑
+        ctx.moveTo(circleX, tradeY + 4);
+        ctx.lineTo(circleX, tradeY - 4);
+        ctx.moveTo(circleX - 3.2, tradeY - 1);
+        ctx.lineTo(circleX, tradeY - 4.2);
+        ctx.lineTo(circleX + 3.2, tradeY - 1);
+      } else {
+        // Down arrow ↓
+        ctx.moveTo(circleX, tradeY - 4);
+        ctx.lineTo(circleX, tradeY + 4);
+        ctx.moveTo(circleX - 3.2, tradeY + 1);
+        ctx.lineTo(circleX, tradeY + 4.2);
+        ctx.lineTo(circleX + 3.2, tradeY + 1);
       }
+      ctx.stroke();
+
       ctx.restore();
     });
 
@@ -1760,7 +1752,7 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       if (currentDist > 10 && touchStartDistRef.current > 10) {
         const scale = currentDist / touchStartDistRef.current;
         const targetCount = Math.round(initialZoomRef.current / scale);
-        const clamped = Math.max(14, Math.min(130, targetCount));
+        const clamped = Math.max(2, Math.min(180, targetCount));
         setZoomVisibleCount(clamped);
       }
     } else if (e.touches.length === 1 && isDraggingRef.current && dragStartRef.current && chartDimsRef.current) {
@@ -1940,7 +1932,7 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
           >
             <Briefcase className="w-4 h-4 stroke-[2]" />
             {activeTrades.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#00e599] text-slate-950 text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow">
+              <span className="absolute -top-1.5 -right-1.5 bg-[#0099ff] text-white text-[9px] font-black rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center shadow">
                 {activeTrades.length}
               </span>
             )}
