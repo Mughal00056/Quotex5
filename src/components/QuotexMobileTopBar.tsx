@@ -336,18 +336,6 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                       <div className="text-base font-extrabold font-mono-num text-white whitespace-nowrap">
                         {formatCurrency(realBalance)}
                       </div>
-                      {realBalance > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeRealMoney();
-                          }}
-                          className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-bold shrink-0"
-                          title="Reset Live Money ($0.00)"
-                        >
-                          Reset $0
-                        </button>
-                      )}
                     </div>
                   </div>
 

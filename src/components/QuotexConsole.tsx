@@ -37,7 +37,7 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
 
   // Expiration state: TIME vs TIMER as requested ("Is tera ka do ho time and timer ok fix karo")
   const [expirationMode, setExpirationMode] = useState<'time' | 'timer'>('timer');
-  const [durationSeconds, setDurationSeconds] = useState<number>(30); // 30s default in Timer mode
+  const [durationSeconds, setDurationSeconds] = useState<number>(60); // 1m (60s) default so trades complete a full 1 minute
   const [timeOffsetMinutes, setTimeOffsetMinutes] = useState<number>(1); // 1 min next close in Time mode
   const [showExpirationPicker, setShowExpirationPicker] = useState<boolean>(false);
   const [nowTimestamp, setNowTimestamp] = useState<number>(Date.now());
@@ -57,9 +57,13 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
   }, []);
 
   // Compute target close time for 'TIME' mode (aligned to upcoming minute: HH:MM:00)
+  // When placed after 30 seconds into the minute ("jab hum 30 sec ka bad trade lagaya tu wo 1min pora kara"),
+  // roll over so the trade completes a full 1 minute!
   const getTargetTimeForOffset = (offsetMinutes: number) => {
+    const secondsIntoMinute = (nowTimestamp / 1000) % 60;
     const nextMinute = Math.ceil(nowTimestamp / 60000) * 60000;
-    return nextMinute + (offsetMinutes - 1) * 60000;
+    const extraMinuteIfAfter30s = secondsIntoMinute >= 30 ? 60000 : 0;
+    return nextMinute + extraMinuteIfAfter30s + (offsetMinutes - 1) * 60000;
   };
 
   const currentTargetTimestamp = getTargetTimeForOffset(timeOffsetMinutes);
@@ -230,10 +234,16 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
 
     setErrorMessage(null);
 
-    // Calculate effective duration: in TIME mode, exact difference to target timestamp; in TIMER mode, fixed seconds
+    // Calculate effective duration: if placed after 30 seconds into the candle, ensure it completes a full 1 minute (60s)
+    const now = Date.now();
+    const secondsIntoMinute = (now / 1000) % 60;
     const tradeDuration =
       expirationMode === 'time'
-        ? Math.max(5, Math.ceil((currentTargetTimestamp - Date.now()) / 1000))
+        ? secondsIntoMinute >= 30 && timeOffsetMinutes === 1
+          ? 60
+          : Math.max(5, Math.ceil((currentTargetTimestamp - now) / 1000))
+        : durationSeconds === 30 && secondsIntoMinute >= 30
+        ? 60
         : durationSeconds;
 
     placeTrade(direction, tradeAmt, tradeDuration);

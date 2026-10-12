@@ -1052,8 +1052,13 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       });
     }
 
-    // Strictly 1-minute (60s) candle countdown pill on the current price line
-    const candleRemainingSec = 60 - (Math.floor(Date.now() / 1000) % 60);
+    // Countdown pill on the current price line:
+    // When an active trade is running on this asset, show the trade's remaining countdown (e.g. full 01:00 -> 00:00 even if placed after 30s);
+    // otherwise show the 1-minute candle countdown.
+    const latestActiveTrade = assetTrades.length > 0 ? assetTrades[assetTrades.length - 1] : null;
+    const candleRemainingSec = latestActiveTrade
+      ? Math.max(0, Math.ceil((latestActiveTrade.closeTime - Date.now()) / 1000))
+      : 60 - (Math.floor(Date.now() / 1000) % 60);
     const mins = Math.floor(candleRemainingSec / 60);
     const secs = candleRemainingSec % 60;
     const timeFormatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
