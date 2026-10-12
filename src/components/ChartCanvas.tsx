@@ -1863,7 +1863,7 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
         >
           {(watermarkType === 'both' || watermarkType === 'logo') && (
             <img
-              src={(logoImageUrl && logoImageUrl.trim()) || '/splash-image.png'}
+              src={(logoImageUrl && logoImageUrl.trim()) || '/apple-touch-icon.png?v=3'}
               alt="Chart Watermark"
               style={{
                 width: `${Math.max(10, Math.min(1000, Number(watermarkSize) || 160))}px`,
@@ -1875,8 +1875,8 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
               className="pointer-events-none select-none transition-[width,height] duration-75"
               onError={(e) => {
                 const target = e.currentTarget;
-                if (!target.src.endsWith('/splash-image.png')) {
-                  target.src = '/splash-image.png';
+                if (!target.src.includes('/apple-touch-icon.png')) {
+                  target.src = '/apple-touch-icon.png?v=3';
                 }
               }}
             />

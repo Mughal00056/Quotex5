@@ -192,7 +192,12 @@ const STORAGE_KEYS = {
 export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Custom Branding (Logo & Background URLs)
   const [logoImageUrl, setLogoImageUrlState] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEYS.LOGO_IMAGE_URL) || '';
+    const saved = localStorage.getItem(STORAGE_KEYS.LOGO_IMAGE_URL) || '';
+    if (saved.includes('splash-image.png')) {
+      localStorage.removeItem(STORAGE_KEYS.LOGO_IMAGE_URL);
+      return '';
+    }
+    return saved;
   });
 
   const setLogoImageUrl = useCallback((url: string) => {

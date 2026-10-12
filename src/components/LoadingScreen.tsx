@@ -5,29 +5,29 @@ interface LoadingScreenProps {
 }
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onLoaded }) => {
-  const [progress, setProgress] = useState(25);
+  const [progress, setProgress] = useState(18);
   const [isDone, setIsDone] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    // Seamlessly take over from the inline HTML logo loader
+    // Seamlessly replace inline HTML splash on every refresh
     const inlineSplash = document.getElementById('initial-splash-screen');
     if (inlineSplash) {
       inlineSplash.style.display = 'none';
     }
 
     const timer = setInterval(() => {
-      setProgress((prev) => Math.min(100, prev + 9));
-    }, 65);
+      setProgress((prev) => Math.min(100, prev + 7));
+    }, 70);
 
     const fadeTimer = setTimeout(() => {
       setIsFadingOut(true);
-    }, 850);
+    }, 1050);
 
     const doneTimer = setTimeout(() => {
       setIsDone(true);
       if (onLoaded) onLoaded();
-    }, 1100);
+    }, 1350);
 
     return () => {
       clearInterval(timer);
@@ -40,31 +40,25 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onLoaded }) => {
 
   return (
     <div
-      style={{
-        background: 'radial-gradient(circle at center, #0f172a 0%, #07090e 70%)'
-      }}
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 select-none transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[100] bg-[#0a0d14] flex flex-col items-center justify-center p-6 select-none transition-opacity duration-300 ${
         isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Powerful Quotex Logo with Glowing Orbital Ring — Zero Text */}
-      <div className="relative w-34 h-34 mb-7 flex items-center justify-center">
-        {/* Outer rotating neon ring */}
-        <div className="absolute -inset-1.5 rounded-full border-[2.5px] border-emerald-500/15 border-t-[#10b981] border-r-[#06b6d4] animate-spin" />
-        {/* Subtle inner glow aura */}
-        <div className="absolute inset-2 rounded-full bg-emerald-500/10 blur-xl animate-pulse" />
-        {/* Quotex Logo Image */}
+      {/* Exact 3-Candlesticks Logo (apple-touch-icon.png) — No Text, Powerful */}
+      <div className="relative w-40 h-40 mb-7 flex items-center justify-center">
+        {/* Subtle ambient emerald/crimson glow */}
+        <div className="absolute inset-2 rounded-3xl bg-gradient-to-tr from-[#ff3355]/15 via-[#00e599]/20 to-[#00e599]/25 blur-2xl animate-pulse" />
         <img
-          src="/splash-image.png"
+          src="/apple-touch-icon.png?v=3"
           alt=""
-          className="relative w-28 h-28 object-contain rounded-3xl drop-shadow-[0_0_24px_rgba(16,185,129,0.45)]"
+          className="relative w-40 h-40 object-contain rounded-[28px] shadow-[0_12px_40px_rgba(0,0,0,0.75)]"
         />
       </div>
 
-      {/* Sleek Progress Bar Only — No Text */}
-      <div className="w-40 bg-[#131b29] rounded-full h-1 overflow-hidden border border-[#233146]/60 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+      {/* Sleek Loading Progress Bar — Zero Text */}
+      <div className="w-[150px] bg-[#141b27] rounded-full h-1 overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-[#10b981] to-[#06b6d4] rounded-full transition-all duration-75 ease-out"
+          className="h-full bg-gradient-to-r from-[#ff3355] via-[#00e599] to-[#00e599] rounded-full transition-all duration-75 ease-out"
           style={{ width: `${Math.min(100, progress)}%` }}
         />
       </div>

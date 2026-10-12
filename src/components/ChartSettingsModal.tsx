@@ -443,26 +443,26 @@ export const ChartSettingsModal: React.FC<ChartSettingsModalProps> = ({
                 )}
               </div>
 
-              {/* Direct Quotex Logo Download & URL Box */}
+              {/* Direct 3-Candlesticks Logo Download & URL Box */}
               <div className="p-2 rounded-lg bg-[#0d121c] border border-emerald-500/30 flex items-center justify-between gap-2 mt-1">
                 <div className="flex items-center gap-2 min-w-0">
                   <img
-                    src="/splash-image.png"
-                    alt="Quotex Logo"
+                    src="/apple-touch-icon.png?v=3"
+                    alt="Candlestick Logo"
                     className="w-7 h-7 rounded-md object-contain bg-[#07090e] border border-emerald-500/30 shrink-0"
                   />
                   <div className="min-w-0">
                     <div className="text-[10px] font-extrabold text-emerald-300 truncate">
-                      Quotex Logo Image
+                      3-Candlesticks Logo (apple-touch-icon.png)
                     </div>
                     <div className="text-[9px] text-slate-400 font-mono truncate">
-                      https://raw.githubusercontent.com/Mughal00056/Quotex4/main/public/splash-image.png
+                      /apple-touch-icon.png
                     </div>
                   </div>
                 </div>
                 <a
-                  href="/splash-image.png"
-                  download="quotex-logo.png"
+                  href="/apple-touch-icon.png?v=3"
+                  download="apple-touch-icon.png"
                   className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] shrink-0 transition-colors"
                 >
                   ⬇️ Download
