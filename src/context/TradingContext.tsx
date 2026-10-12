@@ -774,9 +774,9 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [activeTrades, marketBehaviorMode, activeAsset.id]);
 
   // Real-time Tick Engine: Strict 1-Minute (60,000ms) Candle Alignment
-  // Smooth real-time micro-fluctuations — placing UP or DOWN trade NEVER spikes or jumps suddenly!
+  // Live candle moves smoothly every tick (150ms) by visible pip steps — never frozen in one place, and never teleports on trade entry!
   useEffect(() => {
-    const tickInterval = 200; // 5 ticks/sec for ultra-smooth, zero-lag rendering
+    const tickInterval = 150; // ~6.6 ticks/sec for realistic live OTC candle breathing
     const timeframeMs = 60 * 1000; // Strictly 1 minute per candle
 
     const timer = setInterval(() => {
@@ -788,18 +788,32 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const currentBucket = Math.floor(now / timeframeMs) * timeframeMs;
         const lastCandle = curCandles[curCandles.length - 1];
 
-        const volatility = activeAsset.volatility;
-        // Natural real-time random walk micro-movement (both up and down ticks)
-        let delta = (Math.random() - 0.5) * volatility * 0.028;
+        const pip = Math.pow(10, -activeAsset.decimalPlaces);
+        const volatility = Math.max(activeAsset.volatility || pip * 14, pip * 10);
 
-        // Check active trades on this asset for smooth, gradual real-time drift
+        // Base live tick step: 1 to 3 pips per tick so the candle ALWAYS moves visibly in real time
+        const baseStepPips = 1 + Math.floor(Math.random() * 2.6);
+        const stepSize = Math.max(pip * baseStepPips, volatility * (0.09 + Math.random() * 0.14));
+
+        // Natural mean-reversion toward candle open so normal candles stay well-proportioned
+        const distFromOpen = lastCandle.close - lastCandle.open;
+        const maxNaturalExcursion = volatility * 1.6;
+        let upProb = 0.5;
+        if (distFromOpen > maxNaturalExcursion) upProb = 0.35;
+        else if (distFromOpen < -maxNaturalExcursion) upProb = 0.65;
+
+        if (activeBiasRef.current > 0) upProb = 0.62;
+        else if (activeBiasRef.current < 0) upProb = 0.38;
+
+        let delta = (Math.random() < upProb ? 1 : -1) * stepSize;
+
+        // Check active trades on this asset for smooth, real-time step-by-step movement
         const currentTradesOnAsset = activeTradesRef.current.filter((t) => t.assetId === activeAsset.id);
         if (currentTradesOnAsset.length > 0) {
           const latest = currentTradesOnAsset[0];
           const totalDurationMs = Math.max(2000, latest.closeTime - latest.openTime);
           const elapsedMs = Math.max(0, now - latest.openTime);
           const elapsedRatio = Math.min(1, elapsedMs / totalDurationMs);
-          const timeLeftMs = Math.max(200, latest.closeTime - now);
 
           let targetOutcome: 'WIN' | 'LOSS' = 'WIN';
           if (marketModeRef.current === 'force_loss') {
@@ -812,33 +826,37 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             (latest.direction === 'UP' && targetOutcome === 'WIN') ||
             (latest.direction === 'DOWN' && targetOutcome === 'LOSS');
 
-          const minStep = Math.pow(10, -activeAsset.decimalPlaces) * 2;
-          // Small, realistic target distance from entryPrice (never jumps to candle open + 0.45*volatility!)
-          const gentleOffset = Math.max(minStep * 2, volatility * 0.06);
-          const targetPrice = wantUpFinish
-            ? latest.entryPrice + gentleOffset
-            : latest.entryPrice - gentleOffset;
+          // Comfort zone is 5 to 12 pips (or ~0.45x volatility) in the winning/target direction
+          const minWinDist = Math.max(pip * 4, volatility * 0.3);
+          const maxWinDist = Math.max(pip * 14, volatility * 1.15);
+          const signedProgress = wantUpFinish
+            ? lastCandle.close - latest.entryPrice
+            : latest.entryPrice - lastCandle.close;
 
-          const ticksLeft = Math.max(6, Math.floor(timeLeftMs / tickInterval));
-
-          if (elapsedRatio < 0.3) {
-            // First 30% of trade: 100% natural real-time movement with tiny gentle hint so it NEVER jumps on entry
-            delta = (Math.random() - 0.5) * volatility * 0.026 + (wantUpFinish ? 1 : -1) * volatility * 0.002;
+          let moveInTargetDirProb = 0.68;
+          if (signedProgress < minWinDist) {
+            // Needs to walk smoothly toward the target side of entryPrice
+            moveInTargetDirProb = elapsedRatio > 0.6 ? 0.86 : 0.74;
+          } else if (signedProgress > maxWinDist) {
+            // Already comfortably in profit zone — breathe naturally up and down without flying off screen
+            moveInTargetDirProb = 0.38;
           } else {
-            // Remaining 70% of trade: smooth gradual pull toward targetPrice mixed with real-time micro-jitter
-            const neededPerTick = (targetPrice - lastCandle.close) / ticksLeft;
-            const naturalJitter = (Math.random() - 0.5) * volatility * 0.022;
-            delta = neededPerTick * 0.75 + naturalJitter;
+            // Inside the ideal real-time zone: oscillate naturally up and down while holding the lead
+            moveInTargetDirProb = 0.56;
           }
 
-          // Strictly clamp per-tick movement so the candle can never jump up or down suddenly
-          const maxTickStep = volatility * 0.022;
-          delta = Math.max(-maxTickStep, Math.min(maxTickStep, delta));
-        } else if (activeBiasRef.current !== 0) {
-          delta += activeBiasRef.current * volatility * 0.012;
+          const goTargetDir = Math.random() < moveInTargetDirProb;
+          const dirSign = wantUpFinish ? (goTargetDir ? 1 : -1) : (goTargetDir ? -1 : 1);
+          const tradeStep = Math.max(pip * (1 + Math.floor(Math.random() * 2.2)), volatility * 0.11);
+          delta = dirSign * tradeStep;
         }
 
-        const newPrice = Number((lastCandle.close + delta).toFixed(activeAsset.decimalPlaces));
+        let newPrice = Number((lastCandle.close + delta).toFixed(activeAsset.decimalPlaces));
+        // Guarantee that newPrice changes by at least 1 pip if rounding left it identical
+        if (newPrice === lastCandle.close) {
+          const fallbackDir = delta >= 0 ? 1 : -1;
+          newPrice = Number((lastCandle.close + fallbackDir * pip).toFixed(activeAsset.decimalPlaces));
+        }
         currentPriceRef.current = newPrice;
 
         setAssets((prev) =>
@@ -846,8 +864,9 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
 
         let updatedList: Candle[];
-        // Only start a new candle when the real clock crosses into a new 1-minute bucket
-        if (currentBucket > lastCandle.time) {
+        // Start a new candle when the real clock crosses into a new 1-minute bucket
+        const lastCandleBucket = Math.floor(lastCandle.time / timeframeMs) * timeframeMs;
+        if (currentBucket > lastCandleBucket) {
           const newCandle: Candle = {
             time: currentBucket,
             open: lastCandle.close,
@@ -860,6 +879,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } else {
           const updatedCandle: Candle = {
             ...lastCandle,
+            time: currentBucket,
             high: Math.max(lastCandle.high, newPrice),
             low: Math.min(lastCandle.low, newPrice),
             close: newPrice,

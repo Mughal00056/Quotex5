@@ -6,18 +6,11 @@ import {
   Copy,
   ShieldCheck,
   Sparkles,
-  CreditCard,
   Wallet,
-  Building2,
-  QrCode,
   ArrowRight,
-  Clock,
   Check,
   History,
   ArrowUpRight,
-  Smartphone,
-  Info,
-  RefreshCw,
 } from 'lucide-react';
 
 interface DepositModalProps {
@@ -37,7 +30,6 @@ const PAYMENT_METHODS = [
     max: 50000,
     processingTime: 'Instant (0-2 mins)',
     fee: '0%',
-    color: 'from-[#00b85c] to-[#059669]',
     accountTitle: 'QUOTEX GLOBAL PAY PK',
     accountNumber: '0345-8923410',
     network: 'Easypaisa Direct Merchant',
@@ -52,7 +44,6 @@ const PAYMENT_METHODS = [
     max: 50000,
     processingTime: 'Instant (0-2 mins)',
     fee: '0%',
-    color: 'from-[#ef4444] to-[#dc2626]',
     accountTitle: 'QUOTEX FINTECH PK',
     accountNumber: '0301-7645129',
     network: 'JazzCash Auto-Gateway',
@@ -67,7 +58,6 @@ const PAYMENT_METHODS = [
     max: 500000,
     processingTime: 'Instant',
     fee: '0%',
-    color: 'from-[#f59e0b] to-[#d97706]',
     accountTitle: 'QUOTEX OFFICIAL MERCHANT',
     accountNumber: 'Pay ID: 849201948',
     network: 'Binance Pay Instant',
@@ -82,7 +72,6 @@ const PAYMENT_METHODS = [
     max: 1000000,
     processingTime: '1 - 3 mins',
     fee: '0%',
-    color: 'from-[#10b981] to-[#047857]',
     accountTitle: 'TRON (TRC-20) Deposit Address',
     accountNumber: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE',
     network: 'TRON (TRC-20)',
@@ -97,7 +86,6 @@ const PAYMENT_METHODS = [
     max: 1000000,
     processingTime: '1 - 3 mins',
     fee: '0%',
-    color: 'from-[#eab308] to-[#ca8a04]',
     accountTitle: 'BSC (BEP-20) Deposit Address',
     accountNumber: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
     network: 'BNB Smart Chain (BEP-20)',
@@ -112,7 +100,6 @@ const PAYMENT_METHODS = [
     max: 250000,
     processingTime: 'Instant via Raast / IBFT',
     fee: '0%',
-    color: 'from-[#3b82f6] to-[#2563eb]',
     accountTitle: 'MEEZAN BANK - QUOTEX SETTLEMENT',
     accountNumber: 'PK36MEZN0002840105829104',
     network: 'IBFT / Raast Instant',
@@ -127,7 +114,6 @@ const PAYMENT_METHODS = [
     max: 100000,
     processingTime: 'Instant',
     fee: '0%',
-    color: 'from-[#6366f1] to-[#4f46e5]',
     accountTitle: '3D-Secure Card Gateway',
     accountNumber: 'XXXX-XXXX-XXXX-4210',
     network: 'Visa / MasterCard 3DS',
@@ -142,7 +128,6 @@ const PAYMENT_METHODS = [
     max: 1000000,
     processingTime: '5 - 15 mins',
     fee: '0%',
-    color: 'from-[#f97316] to-[#ea580c]',
     accountTitle: 'BTC SegWit Address',
     accountNumber: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
     network: 'Bitcoin Native SegWit',
@@ -159,33 +144,28 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   onOpenWithdraw,
 }) => {
   const {
-    createDeposit,
-    liveBalance,
-    demoBalance,
+    depositFunds,
+    realBalance = 0,
     accountType,
     setAccountType,
-    depositTransactions,
-    updateDepositStatus,
+    deposits = [],
   } = useTrading();
 
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
   const [amount, setAmount] = useState<number>(100);
   const [useBonus, setUseBonus] = useState<boolean>(true);
-  const [promoCode, setPromoCode] = useState<string>('VIP30');
+  const [promoCode] = useState<string>('VIP30');
   const [senderAccount, setSenderAccount] = useState<string>('');
-  const [customTxId, setCustomTxId] = useState<string>('');
-  const [depositMode, setDepositMode] = useState<'INSTANT' | 'PENDING'>('INSTANT');
   const [step, setStep] = useState<'SELECT' | 'CHECKOUT' | 'PROCESSING' | 'SUCCESS'>('SELECT');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [lastCreatedTxId, setLastCreatedTxId] = useState<string>('');
 
   if (!isOpen) return null;
 
-  const bonusPercent = useBonus ? (amount >= 500 ? 35 : amount >= 100 ? 30 : 20) : 0;
+  const bonusPercent = useBonus ? (amount >= 500 ? 50 : amount >= 100 ? 30 : 20) : 0;
   const bonusAmount = Number(((amount * bonusPercent) / 100).toFixed(2));
   const totalCredited = Number((amount + bonusAmount).toFixed(2));
-  const balanceBefore = liveBalance;
-  const balanceAfter = Number((liveBalance + totalCredited).toFixed(2));
+  const balanceAfter = Number((realBalance + totalCredited).toFixed(2));
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -201,38 +181,27 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
   const handleConfirmPayment = () => {
     setStep('PROCESSING');
-    const generatedRef =
-      customTxId.trim() ||
-      `DEP-${Date.now().toString(36).toUpperCase().slice(-6)}-${Math.random()
-        .toString(36)
-        .substring(2, 6)
-        .toUpperCase()}`;
-
     setTimeout(() => {
-      const tx = createDeposit(
+      const tx = depositFunds(
         amount,
-        bonusAmount,
         selectedMethod.name,
-        generatedRef,
-        selectedMethod.network,
-        depositMode === 'INSTANT' ? 'COMPLETED' : 'PENDING',
-        senderAccount.trim() || 'Verified User Account'
+        useBonus ? promoCode : undefined,
+        senderAccount.trim() || 'Verified Live Account'
       );
-      setLastCreatedTxId(tx.txHash);
-      if (accountType !== 'LIVE') {
-        setAccountType('LIVE');
+      setLastCreatedTxId(tx.txHash || tx.id);
+      if (accountType !== 'REAL') {
+        setAccountType('REAL');
       }
       setStep('SUCCESS');
-    }, 900);
+    }, 650);
   };
 
   const resetModal = () => {
     setStep('SELECT');
-    setCustomTxId('');
     setSenderAccount('');
   };
 
-  const recentDeposits = depositTransactions.slice(0, 4);
+  const recentDeposits = deposits.slice(0, 4);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
@@ -255,7 +224,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <p className="text-[11px] text-[#8b949e]">
                 Live Balance:{' '}
                 <span className="text-[#00b85c] font-mono font-bold">
-                  ${liveBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${realBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </p>
             </div>
@@ -394,81 +363,43 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </div>
               </div>
 
-              {/* 3. Bonus & Credit Mode */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div
-                  onClick={() => setUseBonus(!useBonus)}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                    useBonus
-                      ? 'bg-[#00b85c]/10 border-[#00b85c]/50'
-                      : 'bg-[#181c29] border-[#23293a]'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        useBonus ? 'bg-[#00b85c] text-slate-950' : 'bg-[#23293a] text-[#8b949e]'
-                      }`}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-black text-white flex items-center gap-1.5">
-                        <span>+{bonusPercent}% Deposit Bonus</span>
-                        {useBonus && (
-                          <span className="text-[10px] font-mono text-[#00b85c]">
-                            (+${bonusAmount.toFixed(2)})
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-[#8b949e]">Promo Code: {promoCode}</div>
-                    </div>
-                  </div>
+              {/* 3. Bonus Toggle */}
+              <div
+                onClick={() => setUseBonus(!useBonus)}
+                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                  useBonus
+                    ? 'bg-[#00b85c]/10 border-[#00b85c]/50'
+                    : 'bg-[#181c29] border-[#23293a]'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
                   <div
-                    className={`w-5 h-5 rounded-md flex items-center justify-center border ${
-                      useBonus
-                        ? 'bg-[#00b85c] border-[#00b85c] text-slate-950'
-                        : 'border-[#384152]'
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      useBonus ? 'bg-[#00b85c] text-slate-950' : 'bg-[#23293a] text-[#8b949e]'
                     }`}
                   >
-                    {useBonus && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-white flex items-center gap-1.5">
+                      <span>+{bonusPercent}% Deposit Bonus</span>
+                      {useBonus && (
+                        <span className="text-[10px] font-mono text-[#00b85c]">
+                          (+${bonusAmount.toFixed(2)})
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-[#8b949e]">Promo Code: {promoCode} • Instant Credit</div>
                   </div>
                 </div>
-
-                {/* Settlement Speed Toggle */}
-                <div className="p-3 rounded-xl border border-[#23293a] bg-[#181c29] flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-black text-white">Settlement Mode</div>
-                    <div className="text-[10px] text-[#8b949e]">
-                      {depositMode === 'INSTANT'
-                        ? 'Instant credit to Live Balance'
-                        : 'Create as Pending verification'}
-                    </div>
-                  </div>
-                  <div className="flex bg-[#10131c] p-0.5 rounded-lg border border-[#23293a]">
-                    <button
-                      type="button"
-                      onClick={() => setDepositMode('INSTANT')}
-                      className={`px-2 py-1 rounded-md text-[10px] font-black transition-all cursor-pointer ${
-                        depositMode === 'INSTANT'
-                          ? 'bg-[#00b85c] text-slate-950'
-                          : 'text-[#8b949e]'
-                      }`}
-                    >
-                      INSTANT
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDepositMode('PENDING')}
-                      className={`px-2 py-1 rounded-md text-[10px] font-black transition-all cursor-pointer ${
-                        depositMode === 'PENDING'
-                          ? 'bg-[#f59e0b] text-slate-950'
-                          : 'text-[#8b949e]'
-                      }`}
-                    >
-                      PENDING
-                    </button>
-                  </div>
+                <div
+                  className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                    useBonus
+                      ? 'bg-[#00b85c] border-[#00b85c] text-slate-950'
+                      : 'border-[#384152]'
+                  }`}
+                >
+                  {useBonus && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                 </div>
               </div>
 
@@ -550,32 +481,18 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   </div>
                 </div>
 
-                {/* Optional Sender Info & Transaction ID */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-[#8b949e] mb-1">
-                      Your Sender Account / Phone (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={senderAccount}
-                      onChange={(e) => setSenderAccount(e.target.value)}
-                      placeholder="e.g. 0300-1234567 or Wallet"
-                      className="w-full bg-[#10131c] border border-[#2a3042] focus:border-[#00b85c] rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-[#8b949e] mb-1">
-                      Transaction ID / Reference (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={customTxId}
-                      onChange={(e) => setCustomTxId(e.target.value)}
-                      placeholder="Auto-generated if left blank"
-                      className="w-full bg-[#10131c] border border-[#2a3042] focus:border-[#00b85c] rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none"
-                    />
-                  </div>
+                {/* Optional Sender Info */}
+                <div className="pt-1">
+                  <label className="block text-[10px] font-bold uppercase text-[#8b949e] mb-1">
+                    Your Sender Account / Phone / Wallet Note (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={senderAccount}
+                    onChange={(e) => setSenderAccount(e.target.value)}
+                    placeholder="e.g. 0300-1234567 or Wallet Ref"
+                    className="w-full bg-[#10131c] border border-[#2a3042] focus:border-[#00b85c] rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
+                  />
                 </div>
               </div>
 
@@ -618,9 +535,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
                 </div>
                 <div className="text-base font-black text-white">
-                  {depositMode === 'INSTANT'
-                    ? 'DEPOSIT COMPLETED & CREDITED!'
-                    : 'DEPOSIT SUBMITTED FOR VERIFICATION'}
+                  DEPOSIT COMPLETED & CREDITED!
                 </div>
                 <div className="text-2xl font-mono font-black text-[#00b85c]">
                   +${totalCredited.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -643,7 +558,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 <div className="flex justify-between">
                   <span className="text-[#8b949e]">Updated Live Balance</span>
                   <span className="font-mono font-black text-white">
-                    ${liveBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${realBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -688,7 +603,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
             <div className="pt-2 border-t border-[#23293a]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#8b949e]">
-                  Recent Synchronized Deposits ({depositTransactions.length})
+                  Recent Synchronized Deposits ({deposits.length})
                 </span>
                 {onOpenHistory && (
                   <button
@@ -710,15 +625,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     className="bg-[#10131c] border border-[#23293a] rounded-lg px-3 py-2 flex items-center justify-between text-xs"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          tx.status === 'COMPLETED'
-                            ? 'bg-[#00b85c]'
-                            : tx.status === 'PENDING'
-                            ? 'bg-[#f59e0b]'
-                            : 'bg-[#ff3d3d]'
-                        }`}
-                      />
+                      <span className="w-2 h-2 rounded-full shrink-0 bg-[#00b85c]" />
                       <div className="min-w-0">
                         <div className="font-bold text-white truncate">
                           {tx.method} • <span className="font-mono text-[10px] text-[#8b949e]">{tx.txHash}</span>
@@ -729,31 +636,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 shrink-0">
-                      {tx.status === 'PENDING' && (
-                        <button
-                          type="button"
-                          onClick={() => updateDepositStatus(tx.id, 'COMPLETED')}
-                          className="px-2 py-0.5 rounded bg-[#00b85c]/20 hover:bg-[#00b85c]/30 text-[#00b85c] text-[10px] font-black cursor-pointer"
-                        >
-                          Approve Now
-                        </button>
-                      )}
-                      <div className="text-right">
-                        <div className="font-mono font-black text-[#00b85c]">
-                          +${tx.totalCredited.toFixed(2)}
-                        </div>
-                        <div
-                          className={`text-[9px] font-black uppercase ${
-                            tx.status === 'COMPLETED'
-                              ? 'text-[#00b85c]'
-                              : tx.status === 'PENDING'
-                              ? 'text-[#f59e0b]'
-                              : 'text-[#ff3d3d]'
-                          }`}
-                        >
-                          {tx.status}
-                        </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-mono font-black text-[#00b85c]">
+                        +${tx.totalCredited.toFixed(2)}
+                      </div>
+                      <div className="text-[9px] font-black uppercase text-[#00b85c]">
+                        {tx.status}
                       </div>
                     </div>
                   </div>

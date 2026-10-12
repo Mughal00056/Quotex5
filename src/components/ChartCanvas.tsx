@@ -1002,7 +1002,7 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       const color = isUp ? '#10b981' : '#ef4444';
       const remSec = Math.max(0, Math.ceil((trade.closeTime - Date.now()) / 1000));
 
-      const tradeX = getXFromTime(trade.openTime);
+      const tradeX = getXFromTime(trade.candleTime || latestCandle.time);
       const tradeEndX = getXFromTime(trade.closeTime);
 
       ctx.save();
@@ -1015,16 +1015,21 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       ctx.lineTo(chartWidth, tradeY);
       ctx.stroke();
 
-      // If trade placement candle is within view, draw clean entry tag WITHOUT any green or red dot on the candle bar
+      // If trade placement candle is within view, draw clean entry tag with live countdown (NO green or red dot on the candle bar)
       if (tradeX >= -10 && tradeX <= chartWidth + 10) {
+        const tagW = 84;
+        const tagH = 18;
+        const tagX = Math.max(6, Math.min(chartWidth - tagW - 6, tradeX - tagW / 2));
+        const tagY = tradeY - (isUp ? 22 : -4);
+
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.roundRect(tradeX - 32, tradeY - (isUp ? 22 : -6), 64, 16, 4);
+        ctx.roundRect(tagX, tagY, tagW, tagH, 4);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${isUp ? '▲' : '▼'} $${trade.amount}`, tradeX, tradeY - (isUp ? 11 : -17));
+        ctx.fillText(`${isUp ? '▲' : '▼'} $${trade.amount} • ${remSec}s`, tagX + tagW / 2, tagY + 12.5);
       }
 
       // If trade expiration vertical line is within view
@@ -1048,16 +1053,16 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       }
 
       // QUOTEX STYLE: When user pans backwards into past candles, future active trades ALWAYS stay visible (without any dot)
-      if (panOffset > 0 || tradeEndX > chartWidth || tradeX > chartWidth - 30) {
+      if (panOffset > 0 || tradeX > chartWidth - 10 || tradeX < 10) {
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.roundRect(chartWidth - 90, tradeY - 10, 86, 20, 5);
+        ctx.roundRect(chartWidth - 92, tradeY - 10, 88, 20, 5);
         ctx.fill();
 
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${isUp ? '▲' : '▼'} $${trade.amount} (${remSec}s)`, chartWidth - 47, tradeY + 3.5);
+        ctx.fillText(`${isUp ? '▲' : '▼'} $${trade.amount} (${remSec}s)`, chartWidth - 48, tradeY + 3.5);
       }
       ctx.restore();
     });

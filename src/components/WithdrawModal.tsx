@@ -9,8 +9,6 @@ import {
   History,
   Wallet,
   Copy,
-  Clock,
-  Check,
 } from 'lucide-react';
 
 interface WithdrawModalProps {
@@ -128,17 +126,16 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
   onOpenDeposit,
 }) => {
   const {
-    liveBalance,
-    createWithdrawal,
-    withdrawalTransactions,
-    updateWithdrawalStatus,
+    realBalance = 0,
+    withdrawFunds,
+    withdrawals = [],
+    approveWithdrawal,
   } = useTrading();
 
   const [selectedMethod, setSelectedMethod] = useState(WITHDRAW_METHODS[0]);
   const [amount, setAmount] = useState<number>(100);
   const [destinationAddress, setDestinationAddress] = useState<string>('');
   const [accountHolderName, setAccountHolderName] = useState<string>('');
-  const [payoutSpeedMode, setPayoutSpeedMode] = useState<'COMPLETED' | 'PENDING'>('COMPLETED');
   const [step, setStep] = useState<'FORM' | 'PROCESSING' | 'SUCCESS'>('FORM');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [createdWithdrawalId, setCreatedWithdrawalId] = useState<string>('');
@@ -146,8 +143,8 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
 
   if (!isOpen) return null;
 
-  const balanceAfter = Math.max(0, Number((liveBalance - amount).toFixed(2)));
-  const recentWithdrawals = withdrawalTransactions.slice(0, 4);
+  const balanceAfter = Math.max(0, Number((realBalance - amount).toFixed(2)));
+  const recentWithdrawals = withdrawals.slice(0, 4);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +154,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
       setErrorMsg(`Minimum withdrawal for ${selectedMethod.name} is $${selectedMethod.min}.`);
       return;
     }
-    if (amount > liveBalance) {
+    if (amount > realBalance) {
       setErrorMsg('Insufficient Live Balance for this withdrawal amount.');
       return;
     }
@@ -168,22 +165,20 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
 
     setStep('PROCESSING');
     setTimeout(() => {
-      const tx = createWithdrawal(
+      const res = withdrawFunds(
         amount,
         selectedMethod.name,
         destinationAddress.trim(),
-        selectedMethod.network,
-        payoutSpeedMode,
         accountHolderName.trim() || 'Verified Account Holder'
       );
-      if (!tx) {
-        setErrorMsg('Unable to process withdrawal. Please check your Live balance.');
+      if (!res.success || !res.transaction) {
+        setErrorMsg(res.message || 'Unable to process withdrawal.');
         setStep('FORM');
         return;
       }
-      setCreatedWithdrawalId(tx.id);
+      setCreatedWithdrawalId(res.transaction.txId || res.transaction.id);
       setStep('SUCCESS');
-    }, 900);
+    }, 650);
   };
 
   const resetModal = () => {
@@ -218,7 +213,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
               <p className="text-[11px] text-[#8b949e]">
                 Available for Withdrawal:{' '}
                 <span className="text-[#00b85c] font-mono font-bold">
-                  ${liveBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${realBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </p>
             </div>
@@ -318,10 +313,10 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={() => setAmount(Math.floor(liveBalance * 100) / 100)}
+                    onClick={() => setAmount(Math.floor(realBalance * 100) / 100)}
                     className="text-[10px] font-black text-[#00b85c] hover:underline cursor-pointer"
                   >
-                    MAX: ${liveBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    MAX: ${realBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </button>
                 </div>
 
@@ -332,7 +327,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                   <input
                     type="number"
                     min={selectedMethod.min}
-                    max={liveBalance}
+                    max={realBalance}
                     step="any"
                     value={amount}
                     onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
@@ -395,42 +390,6 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                     />
                   </div>
                 </div>
-
-                {/* Settlement Status Mode */}
-                <div className="pt-2 border-t border-[#23293a] flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-white">Payout Settlement Status</div>
-                    <div className="text-[10px] text-[#8b949e]">
-                      {payoutSpeedMode === 'COMPLETED'
-                        ? 'Instant Completed Payout Receipt'
-                        : 'Show as Processing / Pending in History'}
-                    </div>
-                  </div>
-                  <div className="flex bg-[#10131c] p-0.5 rounded-lg border border-[#23293a]">
-                    <button
-                      type="button"
-                      onClick={() => setPayoutSpeedMode('COMPLETED')}
-                      className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all cursor-pointer ${
-                        payoutSpeedMode === 'COMPLETED'
-                          ? 'bg-[#00b85c] text-slate-950'
-                          : 'text-[#8b949e]'
-                      }`}
-                    >
-                      INSTANT COMPLETED
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPayoutSpeedMode('PENDING')}
-                      className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all cursor-pointer ${
-                        payoutSpeedMode === 'PENDING'
-                          ? 'bg-[#f59e0b] text-slate-950'
-                          : 'text-[#8b949e]'
-                      }`}
-                    >
-                      PROCESSING
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {/* 4. Summary & Submit */}
@@ -475,9 +434,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                   <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
                 </div>
                 <div className="text-base font-black text-white">
-                  {payoutSpeedMode === 'COMPLETED'
-                    ? 'WITHDRAWAL SENT SUCCESSFULLY!'
-                    : 'WITHDRAWAL REQUEST IN PROCESSING'}
+                  WITHDRAWAL SUBMITTED & SYNCHRONIZED!
                 </div>
                 <div className="text-2xl font-mono font-black text-[#00b85c]">
                   ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -514,7 +471,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                 <div className="flex justify-between">
                   <span className="text-[#8b949e]">Updated Live Balance</span>
                   <span className="font-mono font-black text-[#00b85c]">
-                    ${liveBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${realBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -559,7 +516,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
             <div className="pt-2 border-t border-[#23293a]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#8b949e]">
-                  Recent Synchronized Withdrawals ({withdrawalTransactions.length})
+                  Recent Synchronized Withdrawals ({withdrawals.length})
                 </span>
                 {onOpenHistory && (
                   <button
@@ -583,31 +540,31 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                     <div className="flex items-center space-x-2.5 min-w-0">
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 ${
-                          tx.status === 'COMPLETED'
+                          tx.status === 'APPROVED'
                             ? 'bg-[#00b85c]'
-                            : tx.status === 'PENDING'
+                            : tx.status === 'PENDING' || tx.status === 'PROCESSING'
                             ? 'bg-[#f59e0b]'
                             : 'bg-[#ff3d3d]'
                         }`}
                       />
                       <div className="min-w-0">
                         <div className="font-bold text-white truncate">
-                          {tx.method} • <span className="font-mono text-[10px] text-[#8b949e]">{tx.address}</span>
+                          {tx.method} • <span className="font-mono text-[10px] text-[#8b949e]">{tx.destinationAccount}</span>
                         </div>
                         <div className="text-[10px] text-[#8b949e]">
-                          {tx.id} • {new Date(tx.createdAt).toLocaleString()}
+                          {tx.txId || tx.id} • {new Date(tx.createdAt).toLocaleString()}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-2 shrink-0">
-                      {tx.status === 'PENDING' && (
+                      {(tx.status === 'PENDING' || tx.status === 'PROCESSING') && (
                         <button
                           type="button"
-                          onClick={() => updateWithdrawalStatus(tx.id, 'COMPLETED')}
+                          onClick={() => approveWithdrawal(tx.id)}
                           className="px-2 py-0.5 rounded bg-[#00b85c]/20 hover:bg-[#00b85c]/30 text-[#00b85c] text-[10px] font-black cursor-pointer"
                         >
-                          Mark Sent
+                          Approve Now
                         </button>
                       )}
                       <div className="text-right">
@@ -616,14 +573,14 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                         </div>
                         <div
                           className={`text-[9px] font-black uppercase ${
-                            tx.status === 'COMPLETED'
+                            tx.status === 'APPROVED'
                               ? 'text-[#00b85c]'
-                              : tx.status === 'PENDING'
+                              : tx.status === 'PENDING' || tx.status === 'PROCESSING'
                               ? 'text-[#f59e0b]'
                               : 'text-[#ff3d3d]'
                           }`}
                         >
-                          {tx.status}
+                          {tx.status === 'APPROVED' ? 'COMPLETED' : tx.status}
                         </div>
                       </div>
                     </div>

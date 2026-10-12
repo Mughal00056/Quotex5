@@ -7081,12 +7081,12 @@ export const generateHistoricalCandles = (
   count: number = 180
 ): Candle[] => {
   const candles: Candle[] = [];
-  const now = Date.now();
   const msPerCandle = timeframeSeconds * 1000;
+  const currentBucket = Math.floor(Date.now() / msPerCandle) * msPerCandle;
   let currentPrice = asset.basePrice;
 
   for (let i = count - 1; i >= 0; i--) {
-    const time = now - i * msPerCandle;
+    const time = currentBucket - i * msPerCandle;
     const vol = asset.volatility || asset.basePrice * 0.0008;
     const change = (Math.random() - 0.495) * vol * 2;
     const open = currentPrice;

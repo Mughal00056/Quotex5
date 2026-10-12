@@ -14,7 +14,6 @@ import {
   Trash2,
   Wallet,
   FileText,
-  Filter,
   ChevronDown,
   ChevronUp,
   PlusCircle,
@@ -23,13 +22,13 @@ import {
 interface HistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultTab?: 'trades' | 'deposits' | 'withdrawals';
+  defaultTab?: 'trades' | 'deposits' | 'withdrawals' | 'stats';
   onOpenDeposit?: () => void;
   onOpenWithdraw?: () => void;
 }
 
 type HistoryTab = 'ALL_TRANSACTIONS' | 'DEPOSITS' | 'WITHDRAWALS' | 'TRADES';
-type StatusFilter = 'ALL' | 'COMPLETED' | 'PENDING' | 'REJECTED';
+type StatusFilter = 'ALL' | 'APPROVED' | 'PENDING' | 'REJECTED';
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
   isOpen,
@@ -39,15 +38,15 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   onOpenWithdraw,
 }) => {
   const {
-    liveBalance,
-    tradeHistory,
-    depositTransactions,
-    withdrawalTransactions,
-    updateDepositStatus,
-    updateWithdrawalStatus,
-    deleteDepositTransaction,
-    deleteWithdrawalTransaction,
-    clearTradeHistory,
+    realBalance = 0,
+    tradeHistory = [],
+    deposits = [],
+    withdrawals = [],
+    approveWithdrawal,
+    removeDepositFromHistory,
+    removeWithdrawalFromHistory,
+    removeTradeFromHistory,
+    clearAllHistory,
   } = useTrading();
 
   const [activeTab, setActiveTab] = useState<HistoryTab>('ALL_TRANSACTIONS');
@@ -65,27 +64,23 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   }, [isOpen, defaultTab]);
 
   const financialStats = useMemo(() => {
-    const totalDeposited = depositTransactions
-      .filter((d) => d.status === 'COMPLETED')
+    const totalDeposited = deposits
+      .filter((d) => d.status === 'APPROVED')
       .reduce((acc, d) => acc + d.totalCredited, 0);
 
-    const totalWithdrawn = withdrawalTransactions
-      .filter((w) => w.status === 'COMPLETED')
+    const totalWithdrawn = withdrawals
+      .filter((w) => w.status === 'APPROVED')
       .reduce((acc, w) => acc + w.amount, 0);
-
-    const pendingDeposits = depositTransactions.filter((d) => d.status === 'PENDING').length;
-    const pendingWithdrawals = withdrawalTransactions.filter((w) => w.status === 'PENDING').length;
 
     return {
       totalDeposited: Number(totalDeposited.toFixed(2)),
       totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
-      pendingCount: pendingDeposits + pendingWithdrawals,
     };
-  }, [depositTransactions, withdrawalTransactions]);
+  }, [deposits, withdrawals]);
 
   // Unified chronological ledger of Deposits + Withdrawals
   const unifiedLedger = useMemo(() => {
-    const depItems = depositTransactions.map((d) => ({
+    const depItems = deposits.map((d) => ({
       kind: 'DEPOSIT' as const,
       id: d.id,
       refId: d.txHash || d.id,
@@ -93,25 +88,25 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
       bonusAmount: d.bonusAmount,
       netAmount: d.totalCredited,
       method: d.method,
-      network: d.network || 'Direct Gateway',
+      network: d.network || 'Instant Verified Gateway',
       details: d.senderDetails || 'Verified Merchant Deposit',
-      status: d.status,
+      status: d.status === 'APPROVED' ? 'APPROVED' : d.status,
       createdAt: d.createdAt,
       balanceAfter: d.balanceAfter,
     }));
 
-    const wdItems = withdrawalTransactions.map((w) => ({
+    const wdItems = withdrawals.map((w) => ({
       kind: 'WITHDRAWAL' as const,
       id: w.id,
-      refId: w.id,
+      refId: w.txId || w.id,
       amount: w.amount,
       bonusAmount: 0,
       netAmount: w.amount,
       method: w.method,
-      network: w.network || 'Verified Payout Gateway',
-      details: w.address,
+      network: 'Verified Payout Gateway',
+      details: w.destinationAccount,
       accountHolderName: w.accountHolderName,
-      status: w.status,
+      status: w.status === 'PROCESSING' ? 'PENDING' : w.status,
       createdAt: w.createdAt,
       balanceAfter: w.balanceAfter,
     }));
@@ -128,12 +123,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
           item.method.toLowerCase().includes(q) ||
           item.refId.toLowerCase().includes(q) ||
           item.id.toLowerCase().includes(q) ||
-          item.details.toLowerCase().includes(q)
+          (item.details || '').toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [depositTransactions, withdrawalTransactions, activeTab, statusFilter, searchQuery]);
+  }, [deposits, withdrawals, activeTab, statusFilter, searchQuery]);
 
   const filteredTrades = useMemo(() => {
     if (!searchQuery.trim()) return tradeHistory;
@@ -219,12 +214,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               Live Balance
             </div>
             <div className="text-sm sm:text-base font-mono font-black text-white mt-0.5">
-              ${liveBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${realBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
           <div className="bg-[#181c29] border border-[#23293a] rounded-xl p-2.5">
             <div className="text-[9px] uppercase font-black tracking-wider text-[#8b949e]">
-              Total Deposited ({depositTransactions.length})
+              Total Deposited ({deposits.length})
             </div>
             <div className="text-sm sm:text-base font-mono font-black text-[#00b85c] mt-0.5">
               +${financialStats.totalDeposited.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -232,7 +227,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
           </div>
           <div className="bg-[#181c29] border border-[#23293a] rounded-xl p-2.5">
             <div className="text-[9px] uppercase font-black tracking-wider text-[#8b949e]">
-              Total Withdrawn ({withdrawalTransactions.length})
+              Total Withdrawn ({withdrawals.length})
             </div>
             <div className="text-sm sm:text-base font-mono font-black text-[#ff5252] mt-0.5">
               -${financialStats.totalWithdrawn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -251,7 +246,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                   : 'text-[#8b949e] hover:text-white'
               }`}
             >
-              All Cashier ({depositTransactions.length + withdrawalTransactions.length})
+              All Cashier ({deposits.length + withdrawals.length})
             </button>
             <button
               onClick={() => setActiveTab('DEPOSITS')}
@@ -261,7 +256,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                   : 'text-[#8b949e] hover:text-white'
               }`}
             >
-              Deposits ({depositTransactions.length})
+              Deposits ({deposits.length})
             </button>
             <button
               onClick={() => setActiveTab('WITHDRAWALS')}
@@ -271,7 +266,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                   : 'text-[#8b949e] hover:text-white'
               }`}
             >
-              Withdrawals ({withdrawalTransactions.length})
+              Withdrawals ({withdrawals.length})
             </button>
             <button
               onClick={() => setActiveTab('TRADES')}
@@ -300,7 +295,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
             {activeTab !== 'TRADES' ? (
               <div className="flex items-center space-x-1">
-                {(['ALL', 'COMPLETED', 'PENDING', 'REJECTED'] as StatusFilter[]).map((st) => (
+                {(['ALL', 'APPROVED', 'PENDING', 'REJECTED'] as StatusFilter[]).map((st) => (
                   <button
                     key={st}
                     onClick={() => setStatusFilter(st)}
@@ -310,18 +305,18 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                         : 'bg-[#10131c] text-[#8b949e] hover:text-white border border-[#23293a]'
                     }`}
                   >
-                    {st}
+                    {st === 'APPROVED' ? 'COMPLETED' : st}
                   </button>
                 ))}
               </div>
             ) : (
               tradeHistory.length > 0 && (
                 <button
-                  onClick={clearTradeHistory}
+                  onClick={clearAllHistory}
                   className="px-2.5 py-1 rounded-lg bg-[#ff3d3d]/15 hover:bg-[#ff3d3d]/25 text-[#ff5252] text-[10px] font-black flex items-center space-x-1 cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>Clear Trades</span>
+                  <span>Clear History</span>
                 </button>
               )
             )}
@@ -345,12 +340,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               unifiedLedger.map((item) => {
                 const isDeposit = item.kind === 'DEPOSIT';
                 const isExpanded = expandedReceiptId === item.id;
-                const statusColor =
-                  item.status === 'COMPLETED'
-                    ? 'text-[#00b85c] bg-[#00b85c]/15 border-[#00b85c]/30'
-                    : item.status === 'PENDING'
-                    ? 'text-[#f59e0b] bg-[#f59e0b]/15 border-[#f59e0b]/30'
-                    : 'text-[#ff3d3d] bg-[#ff3d3d]/15 border-[#ff3d3d]/30';
+                const isCompleted = item.status === 'APPROVED';
+                const statusColor = isCompleted
+                  ? 'text-[#00b85c] bg-[#00b85c]/15 border-[#00b85c]/30'
+                  : item.status === 'PENDING'
+                  ? 'text-[#f59e0b] bg-[#f59e0b]/15 border-[#f59e0b]/30'
+                  : 'text-[#ff3d3d] bg-[#ff3d3d]/15 border-[#ff3d3d]/30';
 
                 return (
                   <div
@@ -418,14 +413,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             <span
                               className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase border ${statusColor}`}
                             >
-                              {item.status === 'COMPLETED' ? (
+                              {isCompleted ? (
                                 <CheckCircle2 className="w-2.5 h-2.5" />
                               ) : item.status === 'PENDING' ? (
                                 <Clock className="w-2.5 h-2.5" />
                               ) : (
                                 <XCircle className="w-2.5 h-2.5" />
                               )}
-                              <span>{item.status}</span>
+                              <span>{isCompleted ? 'COMPLETED' : item.status}</span>
                             </span>
                           </div>
                         </div>
@@ -501,7 +496,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             <div className="text-[10px] text-[#8b949e]">Ledger Balance After</div>
                             <div className="font-mono font-bold text-white mt-0.5">
                               $
-                              {(item.balanceAfter ?? liveBalance).toLocaleString('en-US', {
+                              {(item.balanceAfter ?? realBalance).toLocaleString('en-US', {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}
@@ -516,35 +511,19 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            {item.status === 'PENDING' && (
-                              <>
-                                <button
-                                  onClick={() =>
-                                    isDeposit
-                                      ? updateDepositStatus(item.id, 'COMPLETED')
-                                      : updateWithdrawalStatus(item.id, 'COMPLETED')
-                                  }
-                                  className="px-3 py-1 rounded-lg bg-[#00b85c] hover:bg-[#00d66c] text-slate-950 font-black text-[10px] cursor-pointer"
-                                >
-                                  ✓ Mark Completed
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    isDeposit
-                                      ? updateDepositStatus(item.id, 'REJECTED')
-                                      : updateWithdrawalStatus(item.id, 'REJECTED')
-                                  }
-                                  className="px-3 py-1 rounded-lg bg-[#ff3d3d]/20 hover:bg-[#ff3d3d]/30 text-[#ff5252] font-black text-[10px] cursor-pointer"
-                                >
-                                  ✕ Cancel / Refund
-                                </button>
-                              </>
+                            {!isDeposit && item.status === 'PENDING' && (
+                              <button
+                                onClick={() => approveWithdrawal(item.id)}
+                                className="px-3 py-1 rounded-lg bg-[#00b85c] hover:bg-[#00d66c] text-slate-950 font-black text-[10px] cursor-pointer"
+                              >
+                                ✓ Mark Completed
+                              </button>
                             )}
                             <button
                               onClick={() =>
                                 isDeposit
-                                  ? deleteDepositTransaction(item.id)
-                                  : deleteWithdrawalTransaction(item.id)
+                                  ? removeDepositFromHistory(item.id)
+                                  : removeWithdrawalFromHistory(item.id)
                               }
                               className="p-1.5 rounded-lg bg-[#1e2436] hover:bg-[#ff3d3d]/20 text-[#8b949e] hover:text-[#ff5252] transition-colors cursor-pointer"
                               title="Remove Record"
@@ -599,35 +578,44 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             {trade.assetName}
                           </span>
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#23293a] text-[#00b85c]">
-                            {trade.payoutPercentage}%
+                            {trade.payoutRate}%
                           </span>
                         </div>
                         <div className="text-[10px] text-[#8b949e] font-mono mt-0.5">
                           Entry: {trade.entryPrice} → Exit: {trade.exitPrice} •{' '}
-                          {new Date(trade.createdAt).toLocaleTimeString()}
+                          {new Date(trade.openTime).toLocaleTimeString()}
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <div
-                        className={`text-sm font-mono font-black ${
-                          isWon
-                            ? 'text-[#00b85c]'
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <div className="text-right">
+                        <div
+                          className={`text-sm font-mono font-black ${
+                            isWon
+                              ? 'text-[#00b85c]'
+                              : isTie
+                              ? 'text-[#f59e0b]'
+                              : 'text-[#ff5252]'
+                          }`}
+                        >
+                          {isWon
+                            ? `+$${(trade.amount + (trade.actualProfit || 0)).toFixed(2)}`
                             : isTie
-                            ? 'text-[#f59e0b]'
-                            : 'text-[#ff5252]'
-                        }`}
+                            ? `$${trade.amount.toFixed(2)}`
+                            : `-$${trade.amount.toFixed(2)}`}
+                        </div>
+                        <div className="text-[10px] text-[#8b949e] font-mono">
+                          Stake: ${trade.amount.toFixed(2)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeTradeFromHistory(trade.id)}
+                        className="p-1.5 rounded-lg bg-[#10131c] hover:bg-[#ff3d3d]/20 text-[#8b949e] hover:text-[#ff5252] transition-colors cursor-pointer"
+                        title="Remove Trade"
                       >
-                        {isWon
-                          ? `+$${(trade.amount + (trade.actualProfit || 0)).toFixed(2)}`
-                          : isTie
-                          ? `$${trade.amount.toFixed(2)}`
-                          : `-$${trade.amount.toFixed(2)}`}
-                      </div>
-                      <div className="text-[10px] text-[#8b949e] font-mono">
-                        Stake: ${trade.amount.toFixed(2)}
-                      </div>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );

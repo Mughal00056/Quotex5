@@ -15,45 +15,30 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onLoaded }) => {
   const activeLogo = logoImageUrl || '/splash-image.png';
 
   useEffect(() => {
-    // Hide inline HTML splash once React component is mounted
     const inlineSplash = document.getElementById('initial-splash-screen');
     if (inlineSplash) {
       inlineSplash.style.display = 'none';
     }
 
     const timer = setInterval(() => {
-      setProgress((prev) => {
-        const step = Math.floor(Math.random() * 6) + 3;
-        const next = prev + step;
+      setProgress((prev) => Math.min(100, prev + 25));
+    }, 35);
 
-        if (next >= 100) {
-          clearInterval(timer);
-          setStatusText('Quotex Platform Ready');
-          setTimeout(() => {
-            setIsFadingOut(true);
-            setTimeout(() => {
-              setIsDone(true);
-              if (onLoaded) onLoaded();
-            }, 450);
-          }, 350);
-          return 100;
-        }
+    const fadeTimer = setTimeout(() => {
+      setStatusText('Quotex Platform Ready');
+      setIsFadingOut(true);
+    }, 180);
 
-        if (next < 25) {
-          setStatusText('Connecting to Quotex Trading Engine...');
-        } else if (next < 55) {
-          setStatusText('Loading Candlestick Feeds & Pairs...');
-        } else if (next < 80) {
-          setStatusText('Calibrating Technical Indicators...');
-        } else {
-          setStatusText('Synchronizing Real-Time Clock...');
-        }
+    const doneTimer = setTimeout(() => {
+      setIsDone(true);
+      if (onLoaded) onLoaded();
+    }, 350);
 
-        return next;
-      });
-    }, 45);
-
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(fadeTimer);
+      clearTimeout(doneTimer);
+    };
   }, [onLoaded]);
 
   if (isDone) return null;
