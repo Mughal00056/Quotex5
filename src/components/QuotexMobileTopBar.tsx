@@ -1662,6 +1662,34 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                         />
                       )}
                     </div>
+
+                    {/* Direct Quotex Logo Download & URL Box */}
+                    <div className="p-2 rounded-lg bg-[#121a28] border border-emerald-500/30 space-y-1.5 mt-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img
+                            src="/splash-image.png"
+                            alt="Quotex Logo"
+                            className="w-7 h-7 rounded-md object-contain bg-[#0a0f18] border border-emerald-500/30 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-[10px] font-extrabold text-emerald-300 truncate">
+                              Official Quotex Logo Image
+                            </div>
+                            <div className="text-[9px] text-slate-400 font-mono truncate">
+                              https://raw.githubusercontent.com/Mughal00056/Quotex4/main/public/splash-image.png
+                            </div>
+                          </div>
+                        </div>
+                        <a
+                          href="/splash-image.png"
+                          download="quotex-logo.png"
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] shrink-0 transition-colors"
+                        >
+                          ⬇️ Download
+                        </a>
+                      </div>
+                    </div>
                   </div>
 
                   <div>

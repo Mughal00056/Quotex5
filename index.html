@@ -3,30 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Quotex Pro Trading Platform</title>
+    <title>Quotex</title>
     <meta name="description" content="Professional binary options trading platform with real-time candlestick charts, technical indicators, account management, and trading tools." />
-    <meta property="og:title" content="Quotex Pro Trading Platform" />
+    <meta property="og:title" content="Quotex" />
     <meta property="og:description" content="Professional binary options trading platform with real-time candlestick charts, technical indicators, account management, and trading tools." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" href="/splash-image.png" />
+    <link rel="apple-touch-icon" href="/splash-image.png" />
     <style>
-      @keyframes spinSlow {
+      @keyframes spinRing {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
       }
-      @keyframes pulseGlow {
-        0%, 100% { opacity: 0.6; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.05); }
+      @keyframes pulseLogo {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 18px rgba(16,185,129,0.35)); }
+        50% { transform: scale(1.04); filter: drop-shadow(0 0 28px rgba(6,182,212,0.55)); }
+      }
+      @keyframes shimmerBar {
+        0% { width: 15%; }
+        50% { width: 65%; }
+        100% { width: 90%; }
       }
     </style>
   </head>
-  <body class="bg-[#0a0d14] text-white">
-    <div id="initial-splash-screen" style="position:fixed;inset:0;z-index:9999;background-color:#0a0d14;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;">
-      <div style="width:48px;height:48px;border-radius:9999px;border:3px solid rgba(16,185,129,0.2);border-top-color:#10b981;animation:spinSlow 0.8s linear infinite;margin-bottom:16px;"></div>
-      <div style="font-size:13px;font-weight:700;letter-spacing:0.08em;color:#e2e8f0;margin-bottom:12px;">Loading...</div>
-      <div style="width:180px;height:4px;background:#161f2e;border-radius:9999px;overflow:hidden;">
-        <div style="width:45%;height:100%;background:#10b981;border-radius:9999px;"></div>
+  <body class="bg-[#07090e] text-white">
+    <!-- Powerful Quotex Logo Loading Screen (No Text) -->
+    <div id="initial-splash-screen" style="position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at center,#0f172a 0%,#07090e 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="position:relative;width:136px;height:136px;display:flex;align-items:center;justify-content:center;margin-bottom:28px;">
+        <div style="position:absolute;inset:-6px;border-radius:9999px;border:2.5px solid rgba(16,185,129,0.15);border-top-color:#10b981;border-right-color:#06b6d4;animation:spinRing 1.1s linear infinite;"></div>
+        <img src="/splash-image.png" alt="" style="width:112px;height:112px;object-fit:contain;border-radius:24px;animation:pulseLogo 1.8s ease-in-out infinite;" />
+      </div>
+      <div style="width:160px;height:4px;background:#131b29;border-radius:9999px;overflow:hidden;border:1px solid rgba(35,49,70,0.6);">
+        <div style="height:100%;background:linear-gradient(90deg,#10b981,#06b6d4);border-radius:9999px;animation:shimmerBar 1.2s ease-out forwards;"></div>
       </div>
     </div>
     <div id="root"></div>

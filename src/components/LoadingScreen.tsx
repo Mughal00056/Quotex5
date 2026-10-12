@@ -5,29 +5,29 @@ interface LoadingScreenProps {
 }
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onLoaded }) => {
-  const [progress, setProgress] = useState(12);
+  const [progress, setProgress] = useState(25);
   const [isDone, setIsDone] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    // Hide inline HTML loader once React loading screen takes over seamlessly
+    // Seamlessly take over from the inline HTML logo loader
     const inlineSplash = document.getElementById('initial-splash-screen');
     if (inlineSplash) {
       inlineSplash.style.display = 'none';
     }
 
     const timer = setInterval(() => {
-      setProgress((prev) => Math.min(100, prev + 8));
-    }, 70);
+      setProgress((prev) => Math.min(100, prev + 9));
+    }, 65);
 
     const fadeTimer = setTimeout(() => {
       setIsFadingOut(true);
-    }, 900);
+    }, 850);
 
     const doneTimer = setTimeout(() => {
       setIsDone(true);
       if (onLoaded) onLoaded();
-    }, 1150);
+    }, 1100);
 
     return () => {
       clearInterval(timer);
@@ -40,25 +40,29 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onLoaded }) => {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] bg-[#0a0d14] flex flex-col items-center justify-center p-6 select-none transition-opacity duration-300 ${
+      style={{
+        background: 'radial-gradient(circle at center, #0f172a 0%, #07090e 70%)'
+      }}
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 select-none transition-opacity duration-300 ${
         isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Clean Spinning Loader Circle (No Splash Image) */}
-      <div className="relative w-14 h-14 mb-5 flex items-center justify-center">
-        <div className="w-14 h-14 rounded-full border-3 border-[#1e293b] border-t-[#10b981] border-r-[#06b6d4] animate-spin" />
-        <span className="absolute font-mono text-[11px] font-bold text-slate-200">
-          {Math.min(100, progress)}%
-        </span>
+      {/* Powerful Quotex Logo with Glowing Orbital Ring — Zero Text */}
+      <div className="relative w-34 h-34 mb-7 flex items-center justify-center">
+        {/* Outer rotating neon ring */}
+        <div className="absolute -inset-1.5 rounded-full border-[2.5px] border-emerald-500/15 border-t-[#10b981] border-r-[#06b6d4] animate-spin" />
+        {/* Subtle inner glow aura */}
+        <div className="absolute inset-2 rounded-full bg-emerald-500/10 blur-xl animate-pulse" />
+        {/* Quotex Logo Image */}
+        <img
+          src="/splash-image.png"
+          alt=""
+          className="relative w-28 h-28 object-contain rounded-3xl drop-shadow-[0_0_24px_rgba(16,185,129,0.45)]"
+        />
       </div>
 
-      {/* Loading Text */}
-      <div className="text-sm font-bold tracking-wider text-slate-200 mb-3">
-        Loading...
-      </div>
-
-      {/* Clean Progress Bar */}
-      <div className="w-48 bg-[#161f2e] rounded-full h-1.5 overflow-hidden border border-[#233146]">
+      {/* Sleek Progress Bar Only — No Text */}
+      <div className="w-40 bg-[#131b29] rounded-full h-1 overflow-hidden border border-[#233146]/60 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
         <div
           className="h-full bg-gradient-to-r from-[#10b981] to-[#06b6d4] rounded-full transition-all duration-75 ease-out"
           style={{ width: `${Math.min(100, progress)}%` }}
