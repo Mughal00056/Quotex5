@@ -1514,40 +1514,84 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                   </div>
 
                   <div>
-                    <div className="flex justify-between text-[11px] text-slate-300 font-semibold mb-1">
-                      <span>Watermark Size:</span>
-                      <span className="text-cyan-400 font-mono font-bold">{watermarkSize}px</span>
+                    <div className="flex items-center justify-between text-[11px] text-slate-300 font-semibold mb-1.5">
+                      <span>Watermark Zoom / Size (10x - 1000x):</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setWatermarkSize(Math.max(10, watermarkSize - 25))}
+                          className="px-1.5 py-0.5 rounded bg-[#1b2538] text-white font-bold text-xs cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="10"
+                          max="1000"
+                          value={watermarkSize}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val)) setWatermarkSize(Math.max(10, Math.min(1000, val)));
+                          }}
+                          className="w-16 bg-[#0a0f18] border border-[#25334a] rounded px-1.5 py-0.5 text-center text-cyan-400 font-mono font-bold text-xs outline-none"
+                        />
+                        <span className="text-[10px] text-cyan-400 font-mono font-bold">x</span>
+                        <button
+                          type="button"
+                          onClick={() => setWatermarkSize(Math.min(1000, watermarkSize + 25))}
+                          className="px-1.5 py-0.5 rounded bg-[#1b2538] text-white font-bold text-xs cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                     <input
                       type="range"
-                      min="50"
-                      max="350"
-                      step="10"
+                      min="10"
+                      max="1000"
+                      step="5"
                       value={watermarkSize}
                       onChange={(e) => setWatermarkSize(parseInt(e.target.value, 10))}
-                      className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-[#141c2b] rounded-lg"
+                      className="w-full accent-cyan-400 cursor-pointer h-2 bg-[#141c2b] rounded-lg"
                     />
+                    <div className="mt-1.5 grid grid-cols-6 gap-1">
+                      {[50, 150, 300, 500, 750, 1000].map((sz) => (
+                        <button
+                          type="button"
+                          key={sz}
+                          onClick={() => setWatermarkSize(sz)}
+                          className={`py-1 rounded text-[10px] font-mono font-bold border transition-all cursor-pointer ${
+                            watermarkSize === sz
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black'
+                              : 'bg-[#141c2b] text-slate-300 border-[#222e42] hover:text-white'
+                          }`}
+                        >
+                          {sz}x
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
                     <div className="flex justify-between text-[11px] text-slate-300 font-semibold mb-1">
-                      <span>Watermark Opacity:</span>
+                      <span>Watermark Opacity (1% - 100%):</span>
                       <span className="text-cyan-400 font-mono font-bold">{Math.round(watermarkOpacity * 100)}%</span>
                     </div>
                     <input
                       type="range"
-                      min="0.03"
-                      max="0.5"
-                      step="0.01"
+                      min="0.02"
+                      max="1"
+                      step="0.02"
                       value={watermarkOpacity}
                       onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
-                      className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-[#141c2b] rounded-lg"
+                      className="w-full accent-cyan-400 cursor-pointer h-2 bg-[#141c2b] rounded-lg"
                     />
                   </div>
 
                   <div className="grid grid-cols-3 gap-1.5">
                     {(['both', 'logo', 'text'] as const).map((mode) => (
                       <button
+                        type="button"
                         key={mode}
                         onClick={() => setWatermarkType(mode)}
                         className={`py-1.5 px-2 rounded-lg text-[10px] font-bold uppercase cursor-pointer ${
@@ -1561,21 +1605,88 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                     ))}
                   </div>
 
-                  <input
-                    type="url"
-                    placeholder="Custom Logo URL (optional)..."
-                    value={logoImageUrl}
-                    onChange={(e) => setLogoImageUrl(e.target.value)}
-                    className="w-full bg-[#0a0f18] border border-[#25334a] rounded-lg px-2.5 py-1.5 text-white font-mono text-xs outline-none"
-                  />
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-300 block">
+                      Custom Watermark Image URL or Upload:
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Paste any image URL (https://... or data:image/...)"
+                        value={logoImageUrl}
+                        onChange={(e) => {
+                          setLogoImageUrl(e.target.value);
+                          if (e.target.value.trim() && !watermarkEnabled) {
+                            setWatermarkEnabled(true);
+                          }
+                        }}
+                        className="flex-1 bg-[#0a0f18] border border-[#25334a] focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs outline-none"
+                      />
+                      {logoImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setLogoImageUrl('')}
+                          className="px-2 py-1 rounded-lg bg-rose-950/60 text-rose-300 text-[10px] font-bold cursor-pointer shrink-0"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
 
-                  <input
-                    type="url"
-                    placeholder="Custom Chart Background URL (optional)..."
-                    value={backgroundImageUrl}
-                    onChange={(e) => setBackgroundImageUrl(e.target.value)}
-                    className="w-full bg-[#0a0f18] border border-[#25334a] rounded-lg px-2.5 py-1.5 text-white font-mono text-xs outline-none"
-                  />
+                    <div className="flex items-center justify-between gap-2 pt-0.5">
+                      <label className="flex-1 py-1.5 px-2.5 rounded-lg bg-[#141c2b] hover:bg-[#1b263b] border border-[#25334a] text-cyan-300 text-[10px] font-bold text-center cursor-pointer transition-colors">
+                        <span>📁 Choose Image From Phone / Gallery</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              if (typeof reader.result === 'string') {
+                                setLogoImageUrl(reader.result);
+                                setWatermarkEnabled(true);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                      {logoImageUrl && (
+                        <img
+                          src={logoImageUrl}
+                          alt="Preview"
+                          className="w-8 h-8 rounded border border-cyan-500/40 object-contain bg-[#0a0f18] shrink-0"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-300 block mb-1">
+                      Custom Chart Background URL (Optional):
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Paste chart background image URL..."
+                        value={backgroundImageUrl}
+                        onChange={(e) => setBackgroundImageUrl(e.target.value)}
+                        className="flex-1 bg-[#0a0f18] border border-[#25334a] focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs outline-none"
+                      />
+                      {backgroundImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setBackgroundImageUrl('')}
+                          className="px-2 py-1 rounded-lg bg-rose-950/60 text-rose-300 text-[10px] font-bold cursor-pointer shrink-0"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
                   <div className="flex justify-end pt-1">
                     <button

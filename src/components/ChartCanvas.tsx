@@ -311,9 +311,8 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // Deep dark background
-    ctx.fillStyle = '#0a0d14';
-    ctx.fillRect(0, 0, width, height);
+    // Clear canvas transparently so the underlying container background & 10x-1000x watermark image layer shine through cleanly
+    ctx.clearRect(0, 0, width, height);
 
     if (displayCandles.length < 2) {
       ctx.restore();
@@ -431,41 +430,7 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       return liveCandleX + idxFloat * candleWidth;
     };
 
-    // 1. Sleek Background Watermark Logo & LIVE/DEMO text with user-adjustable size & opacity
-    if (watermarkEnabled) {
-      ctx.save();
-      const effectiveLogoSize = Math.min(chartWidth * 0.75, chartHeight * 0.75, watermarkSize || 160);
-      const effectiveOpacity = Math.max(0.02, Math.min(0.6, watermarkOpacity || 0.14));
-      const showLogo = watermarkType === 'both' || watermarkType === 'logo';
-      const showText = watermarkType === 'both' || watermarkType === 'text';
-
-      const logoImg = logoImgRef.current;
-      if (showLogo && logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
-        ctx.globalAlpha = effectiveOpacity;
-        ctx.drawImage(
-          logoImg,
-          chartWidth * 0.5 - effectiveLogoSize / 2,
-          topPadding + chartHeight * 0.42 - effectiveLogoSize / 2 - (showText ? 15 : 0),
-          effectiveLogoSize,
-          effectiveLogoSize
-        );
-      }
-
-      if (showText) {
-        ctx.globalAlpha = Math.max(0.04, effectiveOpacity * 0.7);
-        ctx.fillStyle = '#ffffff';
-        const fontSize = Math.max(32, Math.min(110, Math.round(effectiveLogoSize * 0.45)));
-        ctx.font = `900 ${fontSize}px "Plus Jakarta Sans", sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(
-          accountType === 'REAL' ? 'LIVE' : 'DEMO',
-          chartWidth * 0.5,
-          topPadding + chartHeight * 0.42 + (showLogo ? effectiveLogoSize * 0.35 : 0)
-        );
-      }
-      ctx.restore();
-    }
+    // 1. Watermark is rendered via the dedicated unclamped HTML layer behind the canvas (supports 10px to 1000px zoom & any image URL)
 
     // 2. Subtle Grid Lines
     ctx.strokeStyle = '#141a24';
@@ -1888,6 +1853,48 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       }}
       className={`relative w-full h-full select-none overflow-hidden touch-none bg-[#0a0d14] transition-[background-image] duration-300 ${className || ''}`}
     >
+      {/* Unclamped 10x to 1000x Watermark Image & Text Layer (Supports any direct URL, Data URL, SVG/PNG/JPEG/GIF/WebP) */}
+      {watermarkEnabled && (
+        <div
+          className="absolute inset-0 right-[72px] bottom-[30px] pointer-events-none z-0 flex flex-col items-center justify-center overflow-hidden select-none"
+          style={{
+            opacity: Math.max(0.02, Math.min(1, Number(watermarkOpacity) || 0.14))
+          }}
+        >
+          {(watermarkType === 'both' || watermarkType === 'logo') && (
+            <img
+              src={(logoImageUrl && logoImageUrl.trim()) || '/splash-image.png'}
+              alt="Chart Watermark"
+              style={{
+                width: `${Math.max(10, Math.min(1000, Number(watermarkSize) || 160))}px`,
+                height: `${Math.max(10, Math.min(1000, Number(watermarkSize) || 160))}px`,
+                maxWidth: 'none',
+                maxHeight: 'none',
+                objectFit: 'contain'
+              }}
+              className="pointer-events-none select-none transition-[width,height] duration-75"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.endsWith('/splash-image.png')) {
+                  target.src = '/splash-image.png';
+                }
+              }}
+            />
+          )}
+          {(watermarkType === 'both' || watermarkType === 'text') && (
+            <div
+              style={{
+                fontSize: `${Math.max(10, Math.round(Math.max(10, Math.min(1000, Number(watermarkSize) || 160)) * 0.36))}px`,
+                lineHeight: 1.05
+              }}
+              className="font-black tracking-wider text-white uppercase pointer-events-none select-none mt-1 whitespace-nowrap"
+            >
+              {accountType === 'REAL' ? 'LIVE' : 'DEMO'}
+            </div>
+          )}
+        </div>
+      )}
+
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
@@ -1898,7 +1905,7 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
-        className="block w-full h-full cursor-crosshair touch-none"
+        className="relative z-10 block w-full h-full cursor-crosshair touch-none"
       />
 
       {/* RESULT (P/F) Compact Speech Bubble anchored directly next to the live trading candle */}

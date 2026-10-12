@@ -280,37 +280,66 @@ export const ChartSettingsModal: React.FC<ChartSettingsModalProps> = ({
               </span>
             </div>
 
-            {/* 1. Watermark Size Adjustment Slider */}
+            {/* 1. Watermark Size Adjustment Slider (10x to 1000x) */}
             <div>
-              <div className="flex justify-between text-[11px] font-bold text-slate-300 mb-1">
-                <span>Watermark Size (Adjustment):</span>
-                <span className="text-cyan-400 font-mono font-bold">{watermarkSize}px</span>
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1.5">
+                <span>Watermark Zoom / Size (10x - 1000x):</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setWatermarkSize(Math.max(10, watermarkSize - 25))}
+                    className="px-1.5 py-0.5 rounded bg-[#0d121c] border border-[#222e40] text-white font-bold text-xs cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="10"
+                    max="1000"
+                    value={watermarkSize}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) setWatermarkSize(Math.max(10, Math.min(1000, val)));
+                    }}
+                    className="w-16 bg-[#0d121c] border border-[#25334a] rounded px-1.5 py-0.5 text-center text-cyan-400 font-mono font-bold text-xs outline-none"
+                  />
+                  <span className="text-cyan-400 font-mono font-bold text-[10px]">x</span>
+                  <button
+                    type="button"
+                    onClick={() => setWatermarkSize(Math.min(1000, watermarkSize + 25))}
+                    className="px-1.5 py-0.5 rounded bg-[#0d121c] border border-[#222e40] text-white font-bold text-xs cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
               <input
                 type="range"
-                min="50"
-                max="350"
-                step="10"
+                min="10"
+                max="1000"
+                step="5"
                 value={watermarkSize}
                 onChange={(e) => setWatermarkSize(parseInt(e.target.value, 10))}
-                className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-[#0d121c] rounded-lg"
+                className="w-full accent-cyan-400 cursor-pointer h-2 bg-[#0d121c] rounded-lg"
               />
 
-              {/* Quick Preset Sizes */}
-              <div className="mt-2 flex items-center gap-1.5">
+              {/* Quick Preset Sizes up to 1000x */}
+              <div className="mt-2 grid grid-cols-6 gap-1">
                 {[
-                  { label: 'Compact', size: 70 },
-                  { label: 'Medium', size: 130 },
-                  { label: 'Standard', size: 160 },
-                  { label: 'Large', size: 240 },
-                  { label: 'Hero', size: 320 }
+                  { label: '50x', size: 50 },
+                  { label: '150x', size: 150 },
+                  { label: '300x', size: 300 },
+                  { label: '500x', size: 500 },
+                  { label: '750x', size: 750 },
+                  { label: '1000x', size: 1000 }
                 ].map((preset) => (
                   <button
+                    type="button"
                     key={preset.label}
                     onClick={() => setWatermarkSize(preset.size)}
-                    className={`flex-1 text-[10px] py-1 rounded-md border font-bold transition-all cursor-pointer ${
+                    className={`text-[10px] py-1 rounded-md border font-mono font-bold transition-all cursor-pointer ${
                       watermarkSize === preset.size
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-black'
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black'
                         : 'bg-[#0d121c] border-[#222e40] text-slate-400 hover:text-white'
                     }`}
                   >
@@ -320,7 +349,7 @@ export const ChartSettingsModal: React.FC<ChartSettingsModalProps> = ({
               </div>
             </div>
 
-            {/* 2. Watermark Opacity Slider */}
+            {/* 2. Watermark Opacity Slider (1% to 100%) */}
             <div>
               <div className="flex justify-between text-[11px] font-bold text-slate-300 mb-1">
                 <span>Watermark Visibility (Opacity):</span>
@@ -328,12 +357,12 @@ export const ChartSettingsModal: React.FC<ChartSettingsModalProps> = ({
               </div>
               <input
                 type="range"
-                min="0.03"
-                max="0.5"
-                step="0.01"
+                min="0.02"
+                max="1"
+                step="0.02"
                 value={watermarkOpacity}
                 onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
-                className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-[#0d121c] rounded-lg"
+                className="w-full accent-cyan-400 cursor-pointer h-2 bg-[#0d121c] rounded-lg"
               />
             </div>
 
@@ -345,6 +374,7 @@ export const ChartSettingsModal: React.FC<ChartSettingsModalProps> = ({
               <div className="grid grid-cols-3 gap-1.5">
                 {(['both', 'logo', 'text'] as const).map((mode) => (
                   <button
+                    type="button"
                     key={mode}
                     onClick={() => setWatermarkType(mode)}
                     className={`py-1.5 px-2 rounded-lg text-xs font-bold uppercase transition-all cursor-pointer ${
@@ -359,27 +389,57 @@ export const ChartSettingsModal: React.FC<ChartSettingsModalProps> = ({
               </div>
             </div>
 
-            {/* 4. Logo Image URL */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Custom Watermark Logo URL:
+            {/* 4. Logo Image URL & Gallery Upload */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-300 block">
+                Custom Watermark Logo URL or Upload:
               </label>
               <div className="flex gap-1.5">
                 <input
-                  type="url"
-                  placeholder="Paste direct logo image URL..."
+                  type="text"
+                  placeholder="Paste any image URL (https://... or data:image/...)"
                   value={logoImageUrl}
                   onChange={(e) => setLogoImageUrl(e.target.value)}
                   className="flex-1 bg-[#0d121c] border border-[#25334a] rounded-lg px-2.5 py-1.5 text-white font-mono text-xs outline-none focus:border-cyan-400"
                 />
                 {logoImageUrl && (
                   <button
+                    type="button"
                     onClick={() => setLogoImageUrl('')}
                     className="px-2 py-1 rounded bg-[#202b3d] hover:bg-rose-900/50 text-slate-300 hover:text-rose-200 text-xs font-bold transition-colors cursor-pointer"
                     title="Reset to default logo"
                   >
                     Default
                   </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <label className="flex-1 py-1.5 px-2.5 rounded-lg bg-[#0d121c] hover:bg-[#1b263b] border border-[#25334a] text-cyan-300 text-[10px] font-bold text-center cursor-pointer transition-colors">
+                  <span>📁 Upload Image From Device / Gallery</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        if (typeof reader.result === 'string') {
+                          setLogoImageUrl(reader.result);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+                {logoImageUrl && (
+                  <img
+                    src={logoImageUrl}
+                    alt="Preview"
+                    className="w-8 h-8 rounded border border-cyan-500/40 object-contain bg-[#0d121c] shrink-0"
+                  />
                 )}
               </div>
             </div>
