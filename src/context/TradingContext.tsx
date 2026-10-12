@@ -1091,6 +1091,16 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const curCandles = assetCandlesMap[activeAsset.id] || [];
       const currentCandle = curCandles.length > 0 ? curCandles[curCandles.length - 1] : undefined;
 
+      // If tradeDuration matches the current 1-minute candle's remaining seconds (placed in the first 30s, e.g. at 00:45),
+      // lock closeTime to the exact end of the current 1-minute candle so the countdown never drifts by 1s;
+      // if placed after 30s (durationSeconds === 60), run for a full 60,000ms.
+      const elapsedSecInMinute = Math.floor(now / 1000) % 60;
+      const remainingSecInMinute = 60 - elapsedSecInMinute;
+      const exactCloseTime =
+        elapsedSecInMinute < 30 && durationSeconds === remainingSecInMinute
+          ? Math.ceil(now / 60000) * 60000
+          : now + durationSeconds * 1000;
+
       const newTrade: Trade = {
         id: tradeId,
         assetId: activeAsset.id,
@@ -1102,7 +1112,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         potentialProfit: payoutAmount,
         status: 'OPEN',
         openTime: now,
-        closeTime: now + durationSeconds * 1000,
+        closeTime: exactCloseTime,
         candleTime: currentCandle ? currentCandle.time : Math.floor(now / (60 * 1000)) * (60 * 1000),
         durationSeconds,
         accountType

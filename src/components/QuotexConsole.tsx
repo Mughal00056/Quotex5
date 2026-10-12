@@ -56,14 +56,20 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
     return () => clearInterval(interval);
   }, []);
 
-  // Compute target close time for 'TIME' mode (aligned to upcoming minute: HH:MM:00)
-  // When placed after 30 seconds into the minute ("jab hum 30 sec ka bad trade lagaya tu wo 1min pora kara"),
-  // roll over so the trade completes a full 1 minute!
+  // Candle countdown remaining in the current 1-minute candle (60 down to 1)
+  const candleRemainingSec = 60 - (Math.floor(nowTimestamp / 1000) % 60);
+  // Seconds elapsed in the current 1-minute candle (0 to 59)
+  const secondsElapsedInCandle = Math.floor(nowTimestamp / 1000) % 60;
+
+  // Compute target close time for 'TIME' / 1m candle mode:
+  // - Before 30s elapsed (e.g. at 00:45 remaining): stays at 45s (closes at current candle end)
+  // - After 30s elapsed (< 00:30 remaining): becomes full 60s!
   const getTargetTimeForOffset = (offsetMinutes: number) => {
-    const secondsIntoMinute = (nowTimestamp / 1000) % 60;
     const nextMinute = Math.ceil(nowTimestamp / 60000) * 60000;
-    const extraMinuteIfAfter30s = secondsIntoMinute >= 30 ? 60000 : 0;
-    return nextMinute + extraMinuteIfAfter30s + (offsetMinutes - 1) * 60000;
+    if (offsetMinutes === 1) {
+      return secondsElapsedInCandle >= 30 ? nowTimestamp + 60000 : nextMinute;
+    }
+    return nextMinute + (offsetMinutes - 1) * 60000;
   };
 
   const currentTargetTimestamp = getTargetTimeForOffset(timeOffsetMinutes);
@@ -72,7 +78,10 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
     .getMinutes()
     .toString()
     .padStart(2, '0')}:00`;
-  const timeRemainingSeconds = Math.max(5, Math.ceil((currentTargetTimestamp - nowTimestamp) / 1000));
+  const timeRemainingSeconds =
+    secondsElapsedInCandle >= 30 && timeOffsetMinutes === 1
+      ? 60
+      : Math.max(1, Math.ceil((currentTargetTimestamp - nowTimestamp) / 1000));
 
   // Calculate current trade dollar amount
   const effectiveInvestment = isPercentMode
@@ -234,17 +243,26 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
 
     setErrorMessage(null);
 
-    // Calculate effective duration: if placed after 30 seconds into the candle, ensure it completes a full 1 minute (60s)
+    // Exact 1-minute candle rule requested by user:
+    // - If placed in the first 30s of the candle (when candle countdown is 60s..30s, e.g. at 45s), duration stays at that exact remaining time (e.g. 45s).
+    // - If placed after 30s of the candle have passed (when candle countdown is < 30s), duration becomes 60s!
     const now = Date.now();
-    const secondsIntoMinute = (now / 1000) % 60;
-    const tradeDuration =
-      expirationMode === 'time'
-        ? secondsIntoMinute >= 30 && timeOffsetMinutes === 1
-          ? 60
-          : Math.max(5, Math.ceil((currentTargetTimestamp - now) / 1000))
-        : durationSeconds === 30 && secondsIntoMinute >= 30
-        ? 60
-        : durationSeconds;
+    const elapsedSec = Math.floor(now / 1000) % 60;
+    const remainingInCurrentCandle = 60 - elapsedSec;
+
+    let tradeDuration = durationSeconds;
+    if (expirationMode === 'time') {
+      tradeDuration =
+        timeOffsetMinutes === 1
+          ? elapsedSec >= 30
+            ? 60
+            : remainingInCurrentCandle
+          : Math.max(5, Math.ceil((currentTargetTimestamp - now) / 1000));
+    } else if (durationSeconds === 60 || durationSeconds === 30) {
+      // For standard 1m / 30s candle trading:
+      // Before 30s elapsed (e.g. at 00:45) -> stays 45s; After 30s elapsed (< 00:30) -> becomes 60s
+      tradeDuration = elapsedSec >= 30 ? 60 : remainingInCurrentCandle;
+    }
 
     placeTrade(direction, tradeAmt, tradeDuration);
   };
