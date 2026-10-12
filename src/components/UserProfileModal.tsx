@@ -63,29 +63,29 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
           {/* User badge */}
           <div className="flex items-center gap-3 bg-[#151c28] p-3 rounded-xl border border-[#222e40]">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500/20 to-amber-600/30 border border-orange-500/40 flex items-center justify-center shadow-md">
-              <FoxLogo size={32} glow={true} />
+            <div className="w-12 h-12 rounded-xl bg-[#0a0d14] border border-emerald-500/40 flex items-center justify-center shadow-md shrink-0">
+              <FoxLogo size={36} glow={true} />
             </div>
             <div>
               <div className="font-extrabold text-sm text-white flex items-center gap-1.5">
-                <span>Trade Fox Trader #984210</span>
+                <span>Quotex Pro Trader #984210</span>
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
               </div>
-              <div className="text-[11px] text-orange-400 font-bold">Verified Trade Fox Member</div>
+              <div className="text-[11px] text-emerald-400 font-bold">Verified Quotex VIP Member</div>
             </div>
           </div>
 
-          {/* Balances */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Balances (Full LIVE & DEMO Amounts Shown Without Truncation) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="p-3 bg-[#131924] rounded-xl border border-[#1e2738]">
-              <div className="text-[10px] text-slate-400">Live Account</div>
-              <div className="text-base font-extrabold text-amber-400 font-mono-num mt-0.5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Live Account</div>
+              <div className="text-base font-extrabold text-[#00e599] font-mono-num mt-0.5 whitespace-nowrap">
                 {formatCurrency(realBalance)}
               </div>
             </div>
             <div className="p-3 bg-[#131924] rounded-xl border border-[#1e2738]">
-              <div className="text-[10px] text-slate-400">Demo Account</div>
-              <div className="text-base font-extrabold text-cyan-400 font-mono-num mt-0.5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Demo Account</div>
+              <div className="text-base font-extrabold text-amber-400 font-mono-num mt-0.5 whitespace-nowrap">
                 {formatCurrency(demoBalance)}
               </div>
             </div>

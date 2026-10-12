@@ -175,61 +175,76 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
   return (
     <div className="flex flex-col z-30 select-none bg-[#0a0d14]">
       {/* 1. Header Row matching exact screenshot: 3-Line Menu + Unified [LIVE $Balance ▾] Pill + Bell + Deposit */}
-      <div className="h-13 px-2.5 sm:px-3 flex items-center justify-between gap-2 border-b border-[#18212f]">
+      <div className="min-h-13 px-2 sm:px-3 py-1.5 flex items-center justify-between gap-1.5 sm:gap-2 border-b border-[#18212f]">
         {/* Left & Center: 3-Line Hamburger Menu + Unified Account & Balance Pill */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
           {/* 3-Line Hamburger Menu Button */}
           <button
             onClick={() => {
               setOpenPanelId(null); // All panels closed by default on open
               setShowThreeLineMenu(true);
             }}
-            className="w-9 h-9 rounded-xl bg-[#141b27] hover:bg-[#1b2435] border border-[#232f44] flex items-center justify-center text-slate-200 hover:text-white transition-colors cursor-pointer shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#141b27] hover:bg-[#1b2435] border border-[#232f44] flex items-center justify-center text-slate-200 hover:text-white transition-colors cursor-pointer shrink-0"
             title="Trading Control Menu"
           >
-            <Menu className="w-5 h-5 stroke-[2.2]" />
+            <Menu className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
           </button>
 
-          {/* Unified Account + Balance Pill (Matches screenshot: [👑 LIVE $1,745,257.89 ⌄]) */}
-          <div className="relative min-w-0 flex-1 max-w-[235px]">
-            <button
-              onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-              className={`w-full flex items-center justify-between gap-1.5 rounded-2xl px-3 py-1.5 transition-all cursor-pointer border ${
-                accountType === 'REAL' && isVipPurpleLive
-                  ? 'bg-[#1a112b] hover:bg-[#231739] border-purple-500/75 shadow-[0_0_16px_rgba(168,85,247,0.35)]'
-                  : 'bg-[#141b27] hover:bg-[#1a2333] border-[#232f44]'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0 truncate">
-                {accountType === 'REAL' ? (
-                  isVipPurpleLive ? (
-                    <Crown className="w-4 h-4 text-purple-400 fill-purple-400 shrink-0 drop-shadow-[0_0_6px_rgba(192,132,252,0.8)]" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5 text-[#00e599] -rotate-12 shrink-0" />
-                  )
-                ) : (
-                  <span className="text-xs shrink-0">🎓</span>
-                )}
+          {/* Unified Account + Full Balance Pill — Never truncates LIVE or DEMO amount */}
+          <div className="relative flex-1 min-w-0">
+            {(() => {
+              const formattedBal =
+                accountType === 'REAL' ? formatCurrency(realBalance) : formatCurrency(demoBalance);
+              const amountSizeClass =
+                formattedBal.length > 14
+                  ? 'text-[10.5px] sm:text-xs'
+                  : formattedBal.length > 11
+                  ? 'text-[11.5px] sm:text-sm'
+                  : 'text-xs sm:text-sm';
 
-                <span
-                  className={`text-[11px] sm:text-xs font-black uppercase tracking-wider shrink-0 ${
-                    accountType === 'REAL'
-                      ? isVipPurpleLive
-                        ? 'text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]'
-                        : 'text-[#00e599]'
-                      : 'text-amber-400'
+              return (
+                <button
+                  onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+                  className={`w-full flex items-center justify-between gap-1 sm:gap-1.5 rounded-2xl px-2.5 sm:px-3 py-1.5 transition-all cursor-pointer border ${
+                    accountType === 'REAL' && isVipPurpleLive
+                      ? 'bg-[#1a112b] hover:bg-[#231739] border-purple-500/75 shadow-[0_0_16px_rgba(168,85,247,0.35)]'
+                      : 'bg-[#141b27] hover:bg-[#1a2333] border-[#232f44]'
                   }`}
                 >
-                  {accountType === 'REAL' ? 'LIVE' : 'DEMO'}
-                </span>
+                  <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap sm:flex-nowrap">
+                    {accountType === 'REAL' ? (
+                      isVipPurpleLive ? (
+                        <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 fill-purple-400 shrink-0 drop-shadow-[0_0_6px_rgba(192,132,252,0.8)]" />
+                      ) : (
+                        <Send className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#00e599] -rotate-12 shrink-0" />
+                      )
+                    ) : (
+                      <span className="text-xs shrink-0">🎓</span>
+                    )}
 
-                <span className="text-xs sm:text-sm font-extrabold font-mono-num text-white truncate">
-                  {accountType === 'REAL' ? formatCurrency(realBalance) : formatCurrency(demoBalance)}
-                </span>
-              </div>
+                    <span
+                      className={`text-[10px] sm:text-xs font-black uppercase tracking-wider shrink-0 ${
+                        accountType === 'REAL'
+                          ? isVipPurpleLive
+                            ? 'text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]'
+                            : 'text-[#00e599]'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {accountType === 'REAL' ? 'LIVE' : 'DEMO'}
+                    </span>
 
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            </button>
+                    <span
+                      className={`${amountSizeClass} font-extrabold font-mono-num text-white whitespace-nowrap tracking-tight`}
+                    >
+                      {formattedBal}
+                    </span>
+                  </div>
+
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+              );
+            })()}
 
             {/* Account Dropdown */}
             {showAccountDropdown && (
@@ -238,7 +253,7 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                   className="fixed inset-0 z-40 bg-black/30"
                   onClick={() => setShowAccountDropdown(false)}
                 />
-                <div className="absolute left-0 mt-2 w-72 bg-[#141b26] border border-[#273245] rounded-xl shadow-2xl p-3 z-50 animate-scaleUp">
+                <div className="absolute left-0 mt-2 w-76 sm:w-80 max-w-[92vw] bg-[#141b26] border border-[#273245] rounded-xl shadow-2xl p-3 z-50 animate-scaleUp">
                   <div className="text-[10px] text-slate-400 font-bold uppercase mb-2 flex items-center justify-between">
                     <span>Switch Trading Account</span>
                     {isVipPurpleLive && (
@@ -274,7 +289,7 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="text-base font-extrabold font-mono-num text-white mt-1">
+                    <div className="text-base font-extrabold font-mono-num text-white mt-1 whitespace-nowrap break-all">
                       {formatCurrency(demoBalance)}
                     </div>
                   </div>
@@ -317,8 +332,8 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                         LIVE
                       </span>
                     </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="text-base font-extrabold font-mono-num text-white">
+                    <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
+                      <div className="text-base font-extrabold font-mono-num text-white whitespace-nowrap">
                         {formatCurrency(realBalance)}
                       </div>
                       {realBalance > 0 && (
@@ -327,7 +342,7 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                             e.stopPropagation();
                             removeRealMoney();
                           }}
-                          className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-bold"
+                          className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-bold shrink-0"
                           title="Reset Live Money ($0.00)"
                         >
                           Reset $0
@@ -363,21 +378,21 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
         </div>
 
         {/* Right side: Bell icon with badge + Deposit button */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={onOpenNotifications}
-            className="relative w-9 h-9 rounded-xl bg-[#141b27] border border-[#232f44] flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#141b27] border border-[#232f44] flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 flex items-center justify-center">
               1
             </span>
           </button>
 
           <button
             onClick={onOpenDeposit}
-            className="px-4 py-2 rounded-xl bg-[#00e599] hover:bg-[#00f7a5] active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-wide shadow-[0_2px_12px_rgba(0,229,153,0.35)] transition-all cursor-pointer"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#00e599] hover:bg-[#00f7a5] active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-wide shadow-[0_2px_12px_rgba(0,229,153,0.35)] transition-all cursor-pointer"
           >
             Deposit
           </button>
@@ -470,31 +485,36 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
 
           {/* Top Quick Cashier & Account Summary Strip */}
           <div className="px-3.5 py-2.5 bg-[#0f1622] border-b border-[#1c2738] shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center text-white text-xs font-black">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center text-white text-xs font-black shrink-0">
                   {traderFlag}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs font-black text-white flex items-center gap-1">
                     <span>{traderName || 'YA TRADER'}</span>
                     {isVipPurpleLive && accountType === 'REAL' && (
-                      <Crown className="w-3.5 h-3.5 text-purple-400 fill-purple-400" />
+                      <Crown className="w-3.5 h-3.5 text-purple-400 fill-purple-400 shrink-0" />
                     )}
                   </div>
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                    <span className={accountType === 'REAL' ? 'text-[#00e599] font-bold' : 'text-amber-400 font-bold'}>
-                      {accountType === 'REAL' ? 'LIVE' : 'DEMO'}
+                  <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span>
+                      <span className="text-[#00e599] font-bold">LIVE: </span>
+                      <span className="text-white font-mono-num font-bold whitespace-nowrap">
+                        {formatCurrency(realBalance)}
+                      </span>
                     </span>
-                    <span>•</span>
-                    <span className="text-white font-mono-num font-bold">
-                      {accountType === 'REAL' ? formatCurrency(realBalance) : formatCurrency(demoBalance)}
+                    <span>
+                      <span className="text-amber-400 font-bold">DEMO: </span>
+                      <span className="text-white font-mono-num font-bold whitespace-nowrap">
+                        {formatCurrency(demoBalance)}
+                      </span>
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => {
                     setShowThreeLineMenu(false);
@@ -527,19 +547,20 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                 onClick={() => togglePanel('account')}
                 className="px-3.5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#162030] transition-colors"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
                     <Crown className="w-4 h-4" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="font-bold text-white text-xs">1. Account & Live Balance</div>
-                    <div className="text-[10px] text-slate-400">
-                      {accountType === 'REAL' ? `Live: ${formatCurrency(realBalance)}` : `Demo: ${formatCurrency(demoBalance)}`}
+                    <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-2">
+                      <span className="whitespace-nowrap">Live: {formatCurrency(realBalance)}</span>
+                      <span className="whitespace-nowrap">Demo: {formatCurrency(demoBalance)}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -566,23 +587,29 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                   <div className="grid grid-cols-2 gap-1.5">
                     <button
                       onClick={() => setAccountType('REAL')}
-                      className={`py-2 px-2.5 rounded-lg border font-bold text-[11px] cursor-pointer ${
+                      className={`py-2 px-2.5 rounded-lg border font-bold text-[11px] cursor-pointer text-left ${
                         accountType === 'REAL'
                           ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300'
                           : 'bg-[#141c2b] border-[#223049] text-slate-400'
                       }`}
                     >
-                      Switch to LIVE
+                      <div className="text-[10px] uppercase opacity-80">LIVE Account</div>
+                      <div className="font-mono-num font-extrabold text-white text-xs whitespace-nowrap mt-0.5">
+                        {formatCurrency(realBalance)}
+                      </div>
                     </button>
                     <button
                       onClick={() => setAccountType('DEMO')}
-                      className={`py-2 px-2.5 rounded-lg border font-bold text-[11px] cursor-pointer ${
+                      className={`py-2 px-2.5 rounded-lg border font-bold text-[11px] cursor-pointer text-left ${
                         accountType === 'DEMO'
                           ? 'bg-amber-950/60 border-amber-500 text-amber-300'
                           : 'bg-[#141c2b] border-[#223049] text-slate-400'
                       }`}
                     >
-                      Switch to DEMO
+                      <div className="text-[10px] uppercase opacity-80">DEMO Account</div>
+                      <div className="font-mono-num font-extrabold text-white text-xs whitespace-nowrap mt-0.5">
+                        {formatCurrency(demoBalance)}
+                      </div>
                     </button>
                   </div>
 
