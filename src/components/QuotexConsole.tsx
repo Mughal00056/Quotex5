@@ -10,7 +10,8 @@ import {
   Percent,
   DollarSign,
   Clock,
-  Sparkles
+  Sparkles,
+  Globe
 } from 'lucide-react';
 
 interface QuotexConsoleProps {
@@ -25,7 +26,12 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
     demoBalance,
     realBalance,
     setRealBalanceDirect,
-    placeTrade
+    placeTrade,
+    tradingPlatformMode,
+    setTradingPlatformMode,
+    forexPositions,
+    openForexPosition,
+    closeForexPosition
   } = useTrading();
 
   // Investment state directly editable by user
@@ -236,6 +242,33 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
 
     setErrorMessage(null);
 
+    // If Forex mode is active, place a Forex position with 100x multiplier ("aur ma forex trading option jis ma forex trading be kar saka ok")
+    if (tradingPlatformMode === 'FOREX') {
+      const pip = Math.pow(10, -activeAsset.decimalPlaces);
+      const tp = Number(
+        (activeAsset.currentPrice + (direction === 'UP' ? 1 : -1) * pip * 40).toFixed(
+          activeAsset.decimalPlaces
+        )
+      );
+      const sl = Number(
+        (activeAsset.currentPrice - (direction === 'UP' ? 1 : -1) * pip * 25).toFixed(
+          activeAsset.decimalPlaces
+        )
+      );
+      const success = openForexPosition(
+        direction === 'UP' ? 'BUY' : 'SELL',
+        tradeAmt,
+        100,
+        tp,
+        sl
+      );
+      if (!success) {
+        setErrorMessage('Insufficient balance for Forex margin!');
+        setTimeout(() => setErrorMessage(null), 3000);
+      }
+      return;
+    }
+
     // Exact 1-minute candle rule requested by user:
     // - If placed in the first 30s of the candle (when candle countdown is 60s..30s, e.g. at 45s), duration stays at that exact remaining time (e.g. 45s).
     // - If placed after 30s of the candle have passed (when candle countdown is < 30s), duration becomes 60s!
@@ -299,13 +332,13 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
   const [flag1, flag2] = getAssetFlags(activeAsset.symbol);
 
   return (
-    <div className="bg-[#0b0e14] border-t border-[#1a2230] px-3 pt-2 pb-2 select-none relative z-20">
+    <div className="bg-[#0b0e14]/90 backdrop-blur-md border-t border-white/10 px-3 pt-2.5 pb-2 select-none relative z-20">
       {/* Alert toast if balance is $0.00 */}
       {errorMessage && (
-        <div className="absolute -top-11 left-2 right-2 z-30 bg-[#181f2e] border border-rose-500/70 text-white text-xs px-3 py-1.5 rounded-xl flex items-center justify-between shadow-2xl animate-fadeIn">
+        <div className="absolute -top-11 left-2 right-2 z-30 bg-[#162032]/95 backdrop-blur-md border border-rose-500/70 text-white text-xs px-3 py-1.5 rounded-xl flex items-center justify-between shadow-2xl animate-fadeIn">
           <div className="flex items-center gap-1.5 truncate">
             <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            <span className="truncate text-[11px]">{errorMessage}</span>
+            <span className="truncate text-[11px] font-bold">{errorMessage}</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
             {accountType === 'REAL' && (
@@ -332,18 +365,18 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
         </div>
       )}
 
-      {/* Row 1: Asset Selector & Pending Trade Toggle */}
+      {/* Row 1: Asset Selector & Pending Trade Toggle with Glass Sheen */}
       <div className="flex items-center justify-between mb-2">
         <button
           onClick={onOpenAssetModal}
-          className="flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer"
+          className="flex items-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer bg-[#121926]/70 backdrop-blur-xs px-2.5 py-1 rounded-xl border border-white/5"
         >
           {/* Dynamic Circular Flag Badges */}
           <div className="flex items-center -space-x-1.5">
-            <span className="w-5 h-5 rounded-full bg-[#192336] flex items-center justify-center text-[11px] font-bold border border-[#1b2230] shadow-xs">
+            <span className="w-5 h-5 rounded-full bg-[#192336] flex items-center justify-center text-[11px] font-bold border border-white/10 shadow-xs">
               {flag1}
             </span>
-            <span className="w-5 h-5 rounded-full bg-[#192336] flex items-center justify-center text-[11px] font-bold border border-[#1b2230] shadow-xs">
+            <span className="w-5 h-5 rounded-full bg-[#192336] flex items-center justify-center text-[11px] font-bold border border-white/10 shadow-xs">
               {flag2}
             </span>
           </div>
@@ -359,28 +392,28 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
         </button>
 
         {/* Right: Pending Trade Toggle */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-[#0284c7] tracking-wider uppercase">
+        <div className="flex items-center gap-2 bg-[#121926]/70 backdrop-blur-xs px-2 py-1 rounded-xl border border-white/5">
+          <span className="text-[10px] sm:text-[11px] font-black text-[#0284c7] tracking-wider uppercase">
             PENDING TRADE
           </span>
           <button
             onClick={() => setPendingTrade(!pendingTrade)}
-            className={`w-9 h-5 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
-              pendingTrade ? 'bg-[#0284c7] justify-end' : 'bg-[#1e2634] justify-start'
+            className={`w-8 h-4.5 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
+              pendingTrade ? 'bg-cyan-500 justify-end' : 'bg-[#1e2634] justify-start'
             }`}
           >
-            <div className="w-4 h-4 rounded-full bg-white shadow-md transition-transform" />
+            <div className="w-3.5 h-3.5 rounded-full bg-white shadow-md transition-transform" />
           </button>
         </div>
       </div>
 
-      {/* Row 2: Two Side-by-Side Control Boxes: TIME & TIMER + INVESTMENT */}
-      <div className="grid grid-cols-2 gap-2.5 mb-2 relative">
-        {/* Box 1: Quotex Time & Timer Expiration ("Is tera ka do ho time and timer ok fix karo") */}
-        <div className="relative bg-[#0d1118] border border-[#273244] hover:border-[#384760] rounded-xl px-2 py-1.5 flex flex-col justify-between">
+      {/* Row 2: Two Side-by-Side Glass Control Boxes: TIME & TIMER + INVESTMENT */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 mb-2 relative">
+        {/* Box 1: Quotex Time & Timer Expiration with Glass UI */}
+        <div className="relative bg-[#0d131f]/80 backdrop-blur-md border border-white/10 hover:border-cyan-500/40 rounded-xl px-2.5 py-1.5 flex flex-col justify-between shadow-md">
           {/* Top Row: TIME vs TIMER Tab Switcher */}
-          <div className="flex items-center justify-between pb-1 border-b border-[#1f2838]">
-            <div className="flex items-center gap-1 bg-[#0b0e15] p-0.5 rounded-lg border border-[#1f2838]">
+          <div className="flex items-center justify-between pb-1 border-b border-white/5">
+            <div className="flex items-center gap-1 bg-[#0b0e15]/80 p-0.5 rounded-lg border border-white/10">
               <button
                 onClick={() => setExpirationMode('time')}
                 className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all cursor-pointer ${
@@ -548,21 +581,21 @@ export const QuotexConsole: React.FC<QuotexConsoleProps> = ({ onOpenAssetModal }
           )}
         </div>
 
-        {/* Box 2: Investment Directly Editable with Input Field, % Display, and % Picker */}
-        <div className="bg-[#0d1118] border border-[#273244] hover:border-[#384760] rounded-xl px-2 py-1.5 relative flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider flex items-center gap-1">
-              <DollarSign className="w-2.5 h-2.5 text-emerald-400" />
+        {/* Box 2: Investment Directly Editable with Glass UI */}
+        <div className="bg-[#0d131f]/80 backdrop-blur-md border border-white/10 hover:border-emerald-500/40 rounded-xl px-2.5 py-1.5 relative flex flex-col justify-between shadow-md">
+          <div className="flex items-center justify-between pb-1 border-b border-white/5">
+            <span className="text-[10px] font-bold text-slate-300 tracking-wider flex items-center gap-1">
+              <DollarSign className="w-3 h-3 text-emerald-400" />
               <span>Investment</span>
             </span>
 
             {/* Live Percentage Badge */}
             <button
               onClick={() => setShowPercentPicker(!showPercentPicker)}
-              className={`text-[10px] font-mono font-black px-1.5 py-0.2 rounded transition-all cursor-pointer flex items-center gap-0.5 ${
+              className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded transition-all cursor-pointer flex items-center gap-0.5 ${
                 isPercentMode
                   ? 'bg-amber-400 text-slate-950 shadow-xs'
-                  : 'bg-[#182333] text-amber-300 border border-[#25364d]'
+                  : 'bg-[#182333]/90 text-amber-300 border border-white/10'
               }`}
               title="Click to select percentage of balance"
             >

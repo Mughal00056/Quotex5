@@ -15,7 +15,12 @@ import {
   DrawnLine,
   DrawingToolType,
   OrderToast,
-  WatermarkType
+  WatermarkType,
+  TradeResultSummary,
+  TradingPlatformMode,
+  ForexDirection,
+  ForexOrderStatus,
+  ForexPosition
 } from '../types/trading';
 import { INITIAL_ASSETS, generateHistoricalCandles } from '../constants/assets';
 import { sounds } from '../utils/audio';
@@ -105,6 +110,7 @@ interface TradingContextType {
   removeTradeFromHistory: (id: string) => void;
   placeTrade: (direction: TradeDirection, amount: number, durationSeconds: number) => boolean;
   lastClosedTrade: Trade | null;
+  lastTradeResultSummary: TradeResultSummary | null;
   clearLastClosedTrade: () => void;
   orderToast: OrderToast | null;
   clearOrderToast: () => void;
@@ -153,6 +159,21 @@ interface TradingContextType {
   toggleIndicator: (id: string) => void;
   setIndicatorActive: (id: string, active: boolean) => void;
   clearAllActiveIndicators: () => void;
+
+  // Platform Trading Mode & Forex Trading ("aur ma forex trading option jis ma forex trading be kar saka ok")
+  tradingPlatformMode: TradingPlatformMode;
+  setTradingPlatformMode: (mode: TradingPlatformMode) => void;
+  forexPositions: ForexPosition[];
+  forexHistory: ForexPosition[];
+  openForexPosition: (
+    direction: ForexDirection,
+    margin: number,
+    leverage: number,
+    takeProfit?: number,
+    stopLoss?: number
+  ) => boolean;
+  closeForexPosition: (id: string) => void;
+  clearForexHistory: () => void;
 }
 
 const TradingContext = createContext<TradingContextType | undefined>(undefined);
@@ -189,6 +210,9 @@ const STORAGE_KEYS = {
   WATERMARK_OPACITY: 'quotex_watermark_opacity',
   WATERMARK_TYPE: 'quotex_watermark_type',
   ACTIVE_INDICATOR_IDS: 'quotex_active_indicator_ids_v3',
+  TRADING_PLATFORM_MODE: 'quotex_trading_platform_mode_v1',
+  FOREX_POSITIONS: 'quotex_forex_positions_v1',
+  FOREX_HISTORY: 'quotex_forex_history_v1',
 };
 
 export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -536,6 +560,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   });
   const [lastClosedTrade, setLastClosedTrade] = useState<Trade | null>(null);
+  const [lastTradeResultSummary, setLastTradeResultSummary] = useState<TradeResultSummary | null>(null);
 
   const removeTradeFromHistory = useCallback((id: string) => {
     setTradeHistory((prev) => prev.filter((t) => t.id !== id));
@@ -556,6 +581,44 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Per-trade target outcome map for 'realistic' mode (mix of win and lose)
   const tradeOutcomeTargetRef = useRef<Record<string, 'WIN' | 'LOSS'>>({});
   const realisticCounterRef = useRef<number>(0);
+
+  // Platform Mode: BINARY or FOREX ("aur ma forex trading option jis ma forex trading be kar saka ok")
+  const [tradingPlatformMode, setTradingPlatformModeState] = useState<TradingPlatformMode>(() => {
+    return (localStorage.getItem(STORAGE_KEYS.TRADING_PLATFORM_MODE) as TradingPlatformMode) || 'BINARY';
+  });
+  const setTradingPlatformMode = useCallback((mode: TradingPlatformMode) => {
+    setTradingPlatformModeState(mode);
+    localStorage.setItem(STORAGE_KEYS.TRADING_PLATFORM_MODE, mode);
+  }, []);
+
+  const [forexPositions, setForexPositions] = useState<ForexPosition[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.FOREX_POSITIONS);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [forexHistory, setForexHistory] = useState<ForexPosition[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.FOREX_HISTORY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const forexPositionsRef = useRef<ForexPosition[]>(forexPositions);
+  forexPositionsRef.current = forexPositions;
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.FOREX_POSITIONS, JSON.stringify(forexPositions));
+  }, [forexPositions]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.FOREX_HISTORY, JSON.stringify(forexHistory.slice(0, 100)));
+  }, [forexHistory]);
 
   const [orderToast, setOrderToast] = useState<OrderToast | null>(null);
   const orderToastTimerRef = useRef<any>(null);
@@ -871,6 +934,83 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           prev.map((a) => (a.id === activeAsset.id ? { ...a, currentPrice: newPrice } : a))
         );
 
+        // Real-time floating P&L updater for Forex Positions ("aur ma forex trading option jis ma forex trading be kar saka ok")
+        if (forexPositionsRef.current.length > 0) {
+          const positions = forexPositionsRef.current;
+          let changed = false;
+          const remaining: ForexPosition[] = [];
+          const triggered: ForexPosition[] = [];
+
+          positions.forEach((pos) => {
+            if (pos.assetId === activeAsset.id) {
+              const priceDiff =
+                pos.direction === 'BUY'
+                  ? newPrice - pos.openPrice
+                  : pos.openPrice - newPrice;
+              const rawPnl = (priceDiff / pos.openPrice) * pos.margin * pos.leverage;
+              const boundedPnl = Math.max(-pos.margin, rawPnl);
+              const pnl = Number(boundedPnl.toFixed(2));
+              const pnlPercent = Number(((pnl / pos.margin) * 100).toFixed(2));
+
+              let autoClose = false;
+              if (pos.takeProfit) {
+                if (pos.direction === 'BUY' && newPrice >= pos.takeProfit) autoClose = true;
+                if (pos.direction === 'SELL' && newPrice <= pos.takeProfit) autoClose = true;
+              }
+              if (pos.stopLoss) {
+                if (pos.direction === 'BUY' && newPrice <= pos.stopLoss) autoClose = true;
+                if (pos.direction === 'SELL' && newPrice >= pos.stopLoss) autoClose = true;
+              }
+              if (pnl <= -pos.margin * 0.99) {
+                autoClose = true;
+              }
+
+              if (autoClose) {
+                triggered.push({
+                  ...pos,
+                  currentPrice: newPrice,
+                  closePrice: newPrice,
+                  closeTime: now,
+                  pnl,
+                  pnlPercent,
+                  status: 'CLOSED'
+                });
+                changed = true;
+              } else {
+                remaining.push({
+                  ...pos,
+                  currentPrice: newPrice,
+                  pnl,
+                  pnlPercent
+                });
+                if (pnl !== pos.pnl) changed = true;
+              }
+            } else {
+              remaining.push(pos);
+            }
+          });
+
+          if (changed) {
+            setForexPositions(remaining);
+            if (triggered.length > 0) {
+              setForexHistory((prev) => [...triggered, ...prev]);
+              triggered.forEach((tp) => {
+                const returnAmount = Math.max(0, tp.margin + tp.pnl);
+                if (tp.accountType === 'DEMO') {
+                  setDemoBalance((b) => Number((b + returnAmount).toFixed(2)));
+                } else {
+                  setRealBalance((b) => Number((b + returnAmount).toFixed(2)));
+                }
+                if (tp.pnl >= 0) {
+                  sounds.playWinSound();
+                } else {
+                  sounds.playLoseSound();
+                }
+              });
+            }
+          }
+        }
+
         let updatedList: Candle[];
         // Start a new candle when the real clock crosses into a new 1-minute bucket
         const lastCandleBucket = Math.floor(lastCandle.time / timeframeMs) * timeframeMs;
@@ -929,6 +1069,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (expiringTrades.length > 0) {
         setActiveTrades(remainingTrades);
+
+        const resolvedBatch: Trade[] = [];
 
         expiringTrades.forEach((trade) => {
           let exitPrice = currentPriceRef.current;
@@ -1024,7 +1166,6 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return nextVal;
             });
             setCustomLeaderboardRank(null);
-            sounds.playWin();
           } else if (status === 'TIE') {
             if (trade.accountType === 'DEMO') {
               setDemoBalance((b) => Number((b + trade.amount).toFixed(2)));
@@ -1039,12 +1180,64 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return nextVal;
             });
             setCustomLeaderboardRank(null);
-            sounds.playLoss();
           }
 
-          setTradeHistory((prev) => [resolvedTrade, ...prev]);
-          setLastClosedTrade(resolvedTrade);
+          resolvedBatch.push(resolvedTrade);
         });
+
+        // Add all resolved trades to history
+        setTradeHistory((prev) => [...resolvedBatch, ...prev]);
+
+        // Calculate Multi-Trade Result Summary ("Jab hum multiple trade laga tu wo calculate ho ka result p/f ma show ho ok fix")
+        const totalAmount = Number(resolvedBatch.reduce((sum, t) => sum + t.amount, 0).toFixed(2));
+        const totalReturn = Number(
+          resolvedBatch
+            .reduce((sum, t) => {
+              if (t.status === 'WON') return sum + t.amount + (t.actualProfit || 0);
+              if (t.status === 'TIE') return sum + t.amount;
+              return sum;
+            }, 0)
+            .toFixed(2)
+        );
+        const netProfit = Number(
+          resolvedBatch.reduce((sum, t) => sum + (t.actualProfit || 0), 0).toFixed(2)
+        );
+        const wonCount = resolvedBatch.filter((t) => t.status === 'WON').length;
+        const lostCount = resolvedBatch.filter((t) => t.status === 'LOST').length;
+        const tieCount = resolvedBatch.filter((t) => t.status === 'TIE').length;
+
+        let overallStatus: 'WON' | 'LOST' | 'TIE' = 'LOST';
+        if (netProfit > 0 || (wonCount > 0 && lostCount === 0)) {
+          overallStatus = 'WON';
+          sounds.playWin();
+        } else if (netProfit === 0 && tieCount > 0) {
+          overallStatus = 'TIE';
+          sounds.playBeep(600, 0.1);
+        } else {
+          overallStatus = 'LOST';
+          sounds.playLoss();
+        }
+
+        const allUp = resolvedBatch.every((t) => t.direction === 'UP');
+        const allDown = resolvedBatch.every((t) => t.direction === 'DOWN');
+        const overallDirection: 'UP' | 'DOWN' | 'MIXED' = allUp ? 'UP' : allDown ? 'DOWN' : 'MIXED';
+
+        const summary: TradeResultSummary = {
+          tradeCount: resolvedBatch.length,
+          totalAmount,
+          totalReturn,
+          netProfit,
+          wonCount,
+          lostCount,
+          tieCount,
+          status: overallStatus,
+          direction: overallDirection,
+          trades: resolvedBatch,
+          timestamp: Date.now()
+        };
+
+        setLastTradeResultSummary(summary);
+        setLastClosedTrade(resolvedBatch[0] || null);
       }
     }, checkInterval);
 
@@ -1053,12 +1246,13 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Guarantee RESULT (P/F) automatically closes after 5 seconds ("Result p/f 5 second bad band ho hod ok fix")
   useEffect(() => {
-    if (!lastClosedTrade) return;
+    if (!lastClosedTrade && !lastTradeResultSummary) return;
     const timer = setTimeout(() => {
       setLastClosedTrade(null);
+      setLastTradeResultSummary(null);
     }, 5000);
     return () => clearTimeout(timer);
-  }, [lastClosedTrade]);
+  }, [lastClosedTrade, lastTradeResultSummary]);
 
   // Place Trade Action: Does NOT change candle timing or trade timer!
   const placeTrade = useCallback(
@@ -1152,7 +1346,109 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const clearLastClosedTrade = () => {
     setLastClosedTrade(null);
+    setLastTradeResultSummary(null);
   };
+
+  // Open Forex Position ("aur ma forex trading option jis ma forex trading be kar saka ok")
+  const openForexPosition = useCallback(
+    (
+      direction: ForexDirection,
+      margin: number,
+      leverage: number,
+      takeProfit?: number,
+      stopLoss?: number
+    ): boolean => {
+      const balance = accountType === 'DEMO' ? demoBalance : realBalance;
+      if (margin <= 0 || balance < margin) {
+        return false;
+      }
+
+      if (accountType === 'DEMO') {
+        setDemoBalance((b) => Number((b - margin).toFixed(2)));
+      } else {
+        setRealBalance((b) => Number((b - margin).toFixed(2)));
+      }
+
+      const now = Date.now();
+      const currentPrice = currentPriceRef.current;
+      const volumeLots = Number(((margin * leverage) / 100000).toFixed(2));
+      const posId = 'FX-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+
+      const newPos: ForexPosition = {
+        id: posId,
+        assetId: activeAsset.id,
+        assetName: activeAsset.name,
+        assetSymbol: activeAsset.symbol,
+        direction,
+        margin,
+        leverage,
+        volumeLots: Math.max(0.01, volumeLots),
+        openPrice: currentPrice,
+        currentPrice,
+        openTime: now,
+        takeProfit,
+        stopLoss,
+        status: 'OPEN',
+        pnl: 0,
+        pnlPercent: 0,
+        accountType
+      };
+
+      setForexPositions((prev) => [newPos, ...prev]);
+      sounds.playTradePlaced();
+      return true;
+    },
+    [accountType, demoBalance, realBalance, activeAsset]
+  );
+
+  // Close Forex Position manually anytime with instant profit/loss realization
+  const closeForexPosition = useCallback(
+    (positionId: string) => {
+      const pos = forexPositionsRef.current.find((p) => p.id === positionId);
+      if (!pos) return;
+
+      const currentPrice = currentPriceRef.current;
+      const priceDiff =
+        pos.direction === 'BUY'
+          ? currentPrice - pos.openPrice
+          : pos.openPrice - currentPrice;
+      const rawPnl = (priceDiff / pos.openPrice) * pos.margin * pos.leverage;
+      const finalPnl = Number(Math.max(-pos.margin, rawPnl).toFixed(2));
+      const pnlPercent = Number(((finalPnl / pos.margin) * 100).toFixed(2));
+
+      const closedPos: ForexPosition = {
+        ...pos,
+        currentPrice,
+        closePrice: currentPrice,
+        closeTime: Date.now(),
+        pnl: finalPnl,
+        pnlPercent,
+        status: 'CLOSED'
+      };
+
+      const returnAmount = Math.max(0, pos.margin + finalPnl);
+      if (pos.accountType === 'DEMO') {
+        setDemoBalance((b) => Number((b + returnAmount).toFixed(2)));
+      } else {
+        setRealBalance((b) => Number((b + returnAmount).toFixed(2)));
+      }
+
+      setForexPositions((prev) => prev.filter((p) => p.id !== positionId));
+      setForexHistory((prev) => [closedPos, ...prev]);
+
+      if (finalPnl >= 0) {
+        sounds.playWinSound();
+      } else {
+        sounds.playLoseSound();
+      }
+    },
+    []
+  );
+
+  const clearForexHistory = useCallback(() => {
+    setForexHistory([]);
+    localStorage.removeItem(STORAGE_KEYS.FOREX_HISTORY);
+  }, []);
 
   // Cashier: Deposit (Synchronized with Live Balance & History)
   const depositFunds = useCallback(
@@ -1281,6 +1577,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         removeTradeFromHistory,
         placeTrade,
         lastClosedTrade,
+        lastTradeResultSummary,
         clearLastClosedTrade,
         orderToast,
         clearOrderToast,
@@ -1354,7 +1651,14 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setActiveIndicatorIds,
         toggleIndicator,
         setIndicatorActive,
-        clearAllActiveIndicators
+        clearAllActiveIndicators,
+        tradingPlatformMode,
+        setTradingPlatformMode,
+        forexPositions,
+        forexHistory,
+        openForexPosition,
+        closeForexPosition,
+        clearForexHistory
       }}
     >
       {children}

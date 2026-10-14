@@ -82,6 +82,7 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
     indicatorsEnabled,
     showResultPopupEnabled,
     lastClosedTrade,
+    lastTradeResultSummary,
     clearLastClosedTrade,
     logoImageUrl,
     backgroundImageUrl,
@@ -756,26 +757,14 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       });
     }
 
-    // 6. Vertical Lines: Beginning of trade (dashed white line at live candle) & End of trade (to the right) matching screenshot
+    // 6. Vertical Lines: 1st line (Beginning of trade at live candle) is made transparent as requested ("ju 1. Wala line ha wo transparent karo ok")
     const endX = Math.min(chartWidth - 28, liveCandleX + Math.max(44, candleWidth * 2.4));
 
-    // Only draw "Beginning of trade" if live candle is within current screen view
+    // 1st Line ("Beginning of trade") is completely transparent ("ju 1. Wala line ha wo transparent karo ok")
     if (liveCandleX >= -10 && liveCandleX <= chartWidth + 10) {
       ctx.save();
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(liveCandleX, topPadding);
-      ctx.lineTo(liveCandleX, topPadding + chartHeight);
-      ctx.stroke();
-
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#64748b';
-      ctx.font = '10px "Plus Jakarta Sans", sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText('▶', liveCandleX - 6, topPadding + 10);
-      ctx.fillText('Beginning of trade', liveCandleX - 6, topPadding + 23);
+      ctx.strokeStyle = 'transparent';
+      ctx.fillStyle = 'transparent';
       ctx.restore();
     }
 
@@ -1881,7 +1870,12 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
       return;
     }
 
-    if (isDrawingRef.current && draftLine) {
+    if (!isDrawingActive || isPenToolbarHidden || hideDrawings) {
+      if (isDrawingRef.current || draftLine) {
+        isDrawingRef.current = false;
+        setDraftLine(null);
+      }
+    } else if (isDrawingRef.current && draftLine) {
       const coords = screenToChartCoords(x, y);
       if (coords) {
         setDraftLine((prev) => {
@@ -1927,6 +1921,15 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
   const finishDrawing = (upScreenX?: number, upScreenY?: number) => {
     draggedShapeRef.current = null;
     isDraggingCrosshairRef.current = false;
+
+    // Strictly prevent drawing if drawing tool is hidden or Pen is off ("jab hum pen tool ma hide karta ha tu draw fix ok")
+    if (!isDrawingActive || isPenToolbarHidden || hideDrawings) {
+      isDrawingRef.current = false;
+      setDraftLine(null);
+      touchDownPointRef.current = null;
+      return;
+    }
+
     if (isDrawingRef.current && draftLine) {
       isDrawingRef.current = false;
       if (draftLine.type === 'channel') {
@@ -2244,7 +2247,12 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
         return;
       }
 
-      if (isDrawingRef.current && draftLine) {
+      if (!isDrawingActive || isPenToolbarHidden || hideDrawings) {
+        if (isDrawingRef.current || draftLine) {
+          isDrawingRef.current = false;
+          setDraftLine(null);
+        }
+      } else if (isDrawingRef.current && draftLine) {
         const coords = screenToChartCoords(moveX, moveY);
         if (coords) {
           setDraftLine((prev) => {
@@ -2339,17 +2347,27 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
   const penColors = ['#00e599', '#38bdf8', '#eab308', '#ff3355', '#c084fc', '#ffffff'];
 
   // Compute compact RESULT (P/F) Box Position & Styling right next to the live trading candle ("fix result p/f ko chota rako ok fix")
+  // Compute calculated RESULT (P/F) Box Position & Glass UI right next to the live trading candle ("Jab hum multiple trade laga tu wo calculate ho ka result p/f ma show ho ok fix")
   const renderResultBubbleNextToCandle = () => {
-    if (!lastClosedTrade || !showResultPopupEnabled) return null;
+    if ((!lastClosedTrade && !lastTradeResultSummary) || !showResultPopupEnabled) return null;
 
-    const isWon = lastClosedTrade.status === 'WON';
-    const isTie = lastClosedTrade.status === 'TIE';
-    const isRedSell = lastClosedTrade.direction === 'DOWN';
+    const summary = lastTradeResultSummary;
+    const isMultiple = summary ? summary.tradeCount > 1 : false;
+    const tradeCount = summary ? summary.tradeCount : 1;
+    const isWon = summary ? summary.status === 'WON' : lastClosedTrade?.status === 'WON';
+    const isTie = summary ? summary.status === 'TIE' : lastClosedTrade?.status === 'TIE';
+    const direction = summary ? summary.direction : lastClosedTrade?.direction || 'UP';
+    const isRedSell = direction === 'DOWN' || (!isWon && !isTie);
 
-    // Total return payout on win
-    const totalReturn = isWon
-      ? Number((lastClosedTrade.amount + (lastClosedTrade.actualProfit || 0)).toFixed(2))
-      : lastClosedTrade.amount;
+    // Total return payout on win / tie / loss
+    const totalReturn = summary
+      ? summary.totalReturn
+      : isWon
+      ? Number(((lastClosedTrade?.amount || 0) + (lastClosedTrade?.actualProfit || 0)).toFixed(2))
+      : lastClosedTrade?.amount || 0;
+
+    const totalInvested = summary ? summary.totalAmount : lastClosedTrade?.amount || 0;
+    const netProfit = summary ? summary.netProfit : lastClosedTrade?.actualProfit || 0;
 
     const formattedAmount = isWon
       ? `+${totalReturn.toLocaleString('en-US', {
@@ -2358,22 +2376,22 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
         })} $`
       : isTie
       ? `0.00 $`
-      : `-${lastClosedTrade.amount.toLocaleString('en-US', {
+      : `-${totalInvested.toLocaleString('en-US', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
         })} $`;
 
-    // Compact dimensions so it stays small and unobtrusive next to the candle
-    const boxWidth = 114;
-    const boxHeight = 42;
+    // Dynamic responsive dimensions for multiple vs single trades
+    const boxWidth = isMultiple ? 138 : 118;
+    const boxHeight = isMultiple ? 50 : 44;
     const clampedLeft = Math.max(8, Math.min(liveCandleAnchor.chartWidth - boxWidth - 10, liveCandleAnchor.x - boxWidth - 8));
     const clampedTop = Math.max(14, Math.min(liveCandleAnchor.chartHeight - boxHeight - 8, liveCandleAnchor.y - boxHeight / 2));
 
-    const bgClass = isRedSell
-      ? 'bg-[#e11d48]/95 border-[#ff4d6b]/60 shadow-[0_4px_14px_rgba(225,29,72,0.45)]'
-      : 'bg-[#0ca65a]/95 border-[#22c55e]/60 shadow-[0_4px_14px_rgba(12,166,90,0.45)]';
+    const glassBgClass = isRedSell
+      ? 'bg-gradient-to-r from-[#2a0e16]/90 via-[#3d1220]/90 to-[#1f0a10]/95 border-[#ff3355]/60 shadow-[0_8px_24px_rgba(255,51,85,0.45)]'
+      : 'bg-gradient-to-r from-[#0a2618]/90 via-[#0e3b24]/90 to-[#071d13]/95 border-[#00e599]/60 shadow-[0_8px_24px_rgba(0,229,153,0.45)]';
 
-    const pointerColorClass = isRedSell ? 'bg-[#e11d48]/95' : 'bg-[#0ca65a]/95';
+    const pointerColorClass = isRedSell ? 'bg-[#3d1220]/95 border-r border-t border-[#ff3355]/60' : 'bg-[#0e3b24]/95 border-r border-t border-[#00e599]/60';
 
     return (
       <div
@@ -2382,27 +2400,42 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
           top: `${clampedTop}px`,
           width: `${boxWidth}px`
         }}
-        className="absolute z-30 select-none pointer-events-auto transition-all duration-150"
+        className="absolute z-30 select-none pointer-events-auto transition-all duration-150 animate-scaleUp"
       >
-        <div className={`relative rounded-md px-2 py-1 text-white border backdrop-blur-xs ${bgClass}`}>
-          {/* Top Row: Compact RESULT (P/F) and Close × button */}
-          <div className="flex items-center justify-between">
-            <span className="text-[8.5px] font-bold uppercase tracking-wider text-white/90 leading-none">
-              RESULT (P/F)
+        <div className={`relative rounded-xl px-2.5 py-1.5 text-white border backdrop-blur-md ${glassBgClass}`}>
+          {/* Top Row: RESULT (P/F) with Trade Count & Close × button */}
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[8.5px] font-black uppercase tracking-wider text-white/95 leading-none flex items-center gap-1 truncate">
+              <span>RESULT (P/F)</span>
+              {isMultiple && (
+                <span className="bg-white/20 text-[8px] px-1 py-0.2 rounded font-mono-num font-black text-cyan-300">
+                  {tradeCount}x
+                </span>
+              )}
             </span>
             <button
               onClick={clearLastClosedTrade}
-              className="text-white/75 hover:text-white transition-colors -mr-0.5 p-0.5 cursor-pointer"
+              className="text-white/70 hover:text-white transition-colors -mr-0.5 p-0.5 cursor-pointer shrink-0"
               title="Close"
             >
               <X className="w-3 h-3 stroke-[2.5]" />
             </button>
           </div>
 
-          {/* Bottom Row: Compact Payout Amount */}
-          <div className="text-[12px] font-extrabold font-mono-num tracking-tight text-white mt-0.5 leading-tight truncate">
+          {/* Middle Row: Calculated Total Payout Amount */}
+          <div className="text-[12.5px] font-black font-mono-num tracking-tight text-white mt-0.5 leading-tight truncate">
             {formattedAmount}
           </div>
+
+          {/* Bottom Micro Subtitle: Shows net profit for multiple trades */}
+          {isMultiple && (
+            <div className="text-[8.5px] font-mono-num text-slate-300 flex items-center justify-between mt-0.5 pt-0.5 border-t border-white/10 opacity-90 truncate">
+              <span>Inv: ${totalInvested.toFixed(0)}</span>
+              <span className={netProfit >= 0 ? 'text-emerald-300 font-bold' : 'text-rose-300 font-bold'}>
+                Net: {netProfit >= 0 ? '+' : ''}${netProfit.toFixed(2)}
+              </span>
+            </div>
+          )}
 
           {/* Small right-side triangle pointer */}
           <div
@@ -2564,33 +2597,41 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
               )}
             </button>
 
-            {/* Separate (Alada) Hide Button for Drawing Tool / Drawn Shapes right next to Pen when Pen is open or drawings exist */}
+            {/* Separate (Alada) Eye Button: Click Eye to Draw / Toggle Drawings ("Jab hum eye par click kara tu draw ho fix") */}
             {(activeDrawingTool !== 'none' || drawnLines.length > 0 || isPenToolbarHidden || hideDrawings) && (
               <button
                 onClick={() => {
                   const currentlyHidden = isPenToolbarHidden || hideDrawings;
                   if (currentlyHidden) {
-                    // Unhide Drawing Tool & Drawn Shapes
+                    // Unhide and immediately ENABLE DRAWING! ("Jab hum eye par click kara tu draw ho fix")
                     setIsPenToolbarHidden(false);
                     setHideDrawings(false);
+                    setActiveDrawingTool('trendline');
                   } else {
-                    // Hide Drawing Tool & Stop Drawing ("jab hide karo tu draw na ho")
-                    isDrawingRef.current = false;
-                    setDraftLine(null);
-                    setPendingFourDots([]);
-                    setIsPenToolbarHidden(true);
-                    setHideDrawings(true);
+                    // If user clicks Eye button, ensure drawing is ACTIVE!
+                    if (activeDrawingTool === 'none' || activeDrawingTool === 'crosshair') {
+                      setActiveDrawingTool('trendline');
+                      setIsPenToolbarHidden(false);
+                      setHideDrawings(false);
+                    } else {
+                      // Toggle hide/stop
+                      isDrawingRef.current = false;
+                      setDraftLine(null);
+                      setPendingFourDots([]);
+                      setIsPenToolbarHidden(true);
+                      setHideDrawings(true);
+                    }
                   }
                 }}
                 className={`w-8 h-8 rounded-xl border flex items-center justify-center shadow-lg transition-all active:scale-95 cursor-pointer ${
                   isPenToolbarHidden || hideDrawings
                     ? 'bg-rose-500/20 border-rose-400 text-rose-300'
-                    : 'bg-[#141b27]/90 hover:bg-[#1c2637] border-emerald-500/40 text-emerald-300 hover:text-white'
+                    : 'bg-emerald-500/25 border-emerald-400 text-emerald-300 hover:text-white'
                 }`}
                 title={
                   isPenToolbarHidden || hideDrawings
-                    ? 'Show Drawing Tool & Drawings'
-                    : 'Hide Drawing Tool & Stop Drawing'
+                    ? 'Click Eye to Unhide & Draw'
+                    : 'Eye: Click to Draw'
                 }
               >
                 {isPenToolbarHidden || hideDrawings ? (
@@ -2630,6 +2671,22 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
           </button>
         )}
       </div>
+
+      {/* Floating Eye Button when Drawing Toolbar is Hidden: Click Eye to Draw Immediately ("Jab hum eye par click kara tu draw ho fix") */}
+      {(isPenToolbarHidden || hideDrawings) && (
+        <button
+          onClick={() => {
+            setIsPenToolbarHidden(false);
+            setHideDrawings(false);
+            setActiveDrawingTool('trendline');
+          }}
+          className="absolute top-16 left-3.5 z-40 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-2xl border border-emerald-300 flex items-center gap-1.5 cursor-pointer active:scale-95 animate-pulse"
+          title="Click Eye to Draw Immediately"
+        >
+          <Eye className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+          <span>Eye: Click to Draw</span>
+        </button>
+      )}
 
       {/* Interactive Pen Tool Floating & Draggable Toolbar (Only shown when Pen is ON and Drawing Tool is NOT hidden) */}
       {activeDrawingTool !== 'none' && !isPenToolbarHidden && !hideDrawings && (
@@ -2675,19 +2732,26 @@ export const ChartCanvas: React.FC<ChartCanvasProps> = ({
               <span>+ 4-Line</span>
             </button>
 
-            {/* 2. Separate (Alada) Eye Button inside Drawing Tool: Hides Drawing Tool & Stops Drawing ("jab hide karo tu draw na ho alada hide drawing tool ka") */}
+            {/* 2. Separate (Alada) Eye Button inside Drawing Tool: Click to Draw / Toggle ("Jab hum eye par click kara tu draw ho fix") */}
             <button
               onClick={() => {
-                isDrawingRef.current = false;
-                setDraftLine(null);
-                setPendingFourDots([]);
-                setIsPenToolbarHidden(true);
+                if (isPenToolbarHidden || hideDrawings) {
+                  setIsPenToolbarHidden(false);
+                  setHideDrawings(false);
+                  setActiveDrawingTool('trendline');
+                } else {
+                  isDrawingRef.current = false;
+                  setDraftLine(null);
+                  setPendingFourDots([]);
+                  setIsPenToolbarHidden(true);
+                  setHideDrawings(true);
+                }
               }}
               className="px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors flex items-center gap-1 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-400/50"
-              title="Hide Drawing Tool Box (Stops drawing while hidden)"
+              title="Eye: Click to Draw / Hide Tool"
             >
-              <EyeOff className="w-3.5 h-3.5" />
-              <span>Hide Tool</span>
+              <Eye className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Eye (Draw)</span>
             </button>
 
             {/* 3. Custom Shape (4 Dots using ONLY Color Palette color) */}

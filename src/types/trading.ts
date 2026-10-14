@@ -56,6 +56,20 @@ export interface Trade {
   accountType: AccountType;
 }
 
+export interface TradeResultSummary {
+  tradeCount: number;
+  totalAmount: number;
+  totalReturn: number;
+  netProfit: number;
+  wonCount: number;
+  lostCount: number;
+  tieCount: number;
+  status: 'WON' | 'LOST' | 'TIE';
+  direction: 'UP' | 'DOWN' | 'MIXED';
+  trades: Trade[];
+  timestamp: number;
+}
+
 export type DepositStatus = 'APPROVED' | 'PENDING' | 'REJECTED';
 export type WithdrawalStatus = 'APPROVED' | 'PENDING' | 'PROCESSING' | 'REJECTED';
 
@@ -215,3 +229,30 @@ export type MarketBehaviorMode =
   | 'realistic'  // Realistic trading mix of both Win and Lose
   | 'bull_trend' // Strong uptrend
   | 'bear_trend'; // Strong downtrend
+
+export type TradingPlatformMode = 'BINARY' | 'FOREX';
+export type ForexDirection = 'BUY' | 'SELL';
+export type ForexOrderStatus = 'OPEN' | 'CLOSED';
+
+export interface ForexPosition {
+  id: string;
+  assetId: string;
+  assetName: string;
+  assetSymbol: string;
+  direction: ForexDirection; // BUY (Long) or SELL (Short)
+  margin: number; // Invested collateral in USD
+  leverage: number; // Multiplier: 20x, 50x, 100x, 200x, 500x
+  volumeLots: number; // Approximate lot size
+  openPrice: number;
+  currentPrice: number;
+  openTime: number;
+  closeTime?: number;
+  takeProfit?: number; // Target price
+  stopLoss?: number; // Stop price
+  status: ForexOrderStatus;
+  pnl: number; // Floating profit or loss in USD
+  pnlPercent: number; // Floating profit or loss %
+  closePrice?: number;
+  accountType: AccountType;
+}
+

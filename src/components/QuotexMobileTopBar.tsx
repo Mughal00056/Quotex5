@@ -36,9 +36,22 @@ import {
   CandlestickChart,
   Layers,
   Activity,
-  LineChart
+  LineChart,
+  Lock,
+  Unlock,
+  KeyRound,
+  ShieldCheck,
+  Globe,
+  Radio,
+  Gift,
+  HelpCircle,
+  CheckCircle2,
+  Percent,
+  Zap,
+  Check,
+  ExternalLink
 } from 'lucide-react';
-import { formatCurrency } from '../utils/chartMath';
+import { formatCurrency, formatPrice } from '../utils/chartMath';
 import { CANDLE_COLOR_SCHEMES, CandleColorScheme, ChartType } from '../types/trading';
 
 interface QuotexMobileTopBarProps {
@@ -55,6 +68,10 @@ interface QuotexMobileTopBarProps {
 }
 
 type MenuPanelId =
+  | 'forex'
+  | 'signals'
+  | 'tournaments'
+  | 'market'
   | 'account'
   | 'trade_mode'
   | 'chart_icons'
@@ -64,7 +81,8 @@ type MenuPanelId =
   | 'notifications_sound'
   | 'leaderboard'
   | 'watermark_bg'
-  | 'cashier_history';
+  | 'cashier_history'
+  | 'support';
 
 export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
   onOpenDeposit,
@@ -141,12 +159,75 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
     setWatermarkType,
     deposits,
     withdrawals,
-    tradeHistory
+    tradeHistory,
+    tradingPlatformMode,
+    setTradingPlatformMode,
+    forexPositions,
+    forexHistory,
+    openForexPosition,
+    closeForexPosition,
+    clearForexHistory,
+    activeAsset,
+    assets,
+    setActiveAsset
   } = useTrading();
 
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showPromoBanner, setShowPromoBanner] = useState(false);
   const [showThreeLineMenu, setShowThreeLineMenu] = useState(false);
+
+  // Menu PIN Lock with code 1234 — Unlocked by default so ALL Quotex features are immediately available!
+  const [showMenuPinLock, setShowMenuPinLock] = useState(false);
+  const [isMenuUnlocked, setIsMenuUnlocked] = useState(true);
+  const [menuPinInput, setMenuPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [pinSuccess, setPinSuccess] = useState(false);
+
+  // Forex Trading State in Menu ("aur ma forex trading option jis ma forex trading be kar saka ok")
+  const [forexMargin, setForexMargin] = useState<number>(50);
+  const [forexLeverage, setForexLeverage] = useState<number>(100);
+  const [forexTpPercent, setForexTpPercent] = useState<number>(50);
+  const [forexSlPercent, setForexSlPercent] = useState<number>(30);
+  const [forexMessage, setForexMessage] = useState<string | null>(null);
+  const [menuFilterCategory, setMenuFilterCategory] = useState<'ALL' | 'FOREX' | 'TRADING' | 'TOOLS' | 'CASHIER'>('ALL');
+  const [copiedSignalId, setCopiedSignalId] = useState<string | null>(null);
+
+  const handlePinDigit = (digit: string) => {
+    if (menuPinInput.length >= 4) return;
+    const next = menuPinInput + digit;
+    setMenuPinInput(next);
+    setPinError(false);
+
+    if (next.length === 4) {
+      if (next === '1234') {
+        setPinSuccess(true);
+        setTimeout(() => {
+          setIsMenuUnlocked(true);
+          setShowMenuPinLock(false);
+          setMenuPinInput('');
+          setPinSuccess(false);
+          setOpenPanelId(null);
+          setShowThreeLineMenu(true);
+        }, 400);
+      } else {
+        setPinError(true);
+        setTimeout(() => {
+          setMenuPinInput('');
+          setPinError(false);
+        }, 900);
+      }
+    }
+  };
+
+  const handlePinBackspace = () => {
+    setMenuPinInput((prev) => prev.slice(0, -1));
+    setPinError(false);
+  };
+
+  const handlePinClear = () => {
+    setMenuPinInput('');
+    setPinError(false);
+  };
 
   // Separate accordion panels — all closed ("band") by default as requested
   const [openPanelId, setOpenPanelId] = useState<MenuPanelId | null>(null);
@@ -173,21 +254,59 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
   ];
 
   return (
-    <div className="flex flex-col z-30 select-none bg-[#0a0d14]">
-      {/* 1. Header Row matching exact screenshot: 3-Line Menu + Unified [LIVE $Balance ▾] Pill + Bell + Deposit */}
-      <div className="min-h-13 px-2 sm:px-3 py-1.5 flex items-center justify-between gap-1.5 sm:gap-2 border-b border-[#18212f]">
+    <div className="flex flex-col z-30 select-none bg-[#0a0d14]/90 backdrop-blur-md">
+      {/* 1. Header Row matching exact screenshot: 3-Line Menu (PIN Lock 1234) + Unified [LIVE $Balance ▾] Pill + Bell + Deposit */}
+      <div className="min-h-13 px-2 sm:px-3 py-1.5 flex items-center justify-between gap-1.5 sm:gap-2 border-b border-white/10">
         {/* Left & Center: 3-Line Hamburger Menu + Unified Account & Balance Pill */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
-          {/* 3-Line Hamburger Menu Button */}
+          {/* 3-Line Hamburger Menu Button with 1234 PIN Lock */}
           <button
             onClick={() => {
-              setOpenPanelId(null); // All panels closed by default on open
-              setShowThreeLineMenu(true);
+              if (isMenuUnlocked) {
+                setOpenPanelId(null);
+                setShowThreeLineMenu(true);
+              } else {
+                setMenuPinInput('');
+                setPinError(false);
+                setPinSuccess(false);
+                setShowMenuPinLock(true);
+              }
             }}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#141b27] hover:bg-[#1b2435] border border-[#232f44] flex items-center justify-center text-slate-200 hover:text-white transition-colors cursor-pointer shrink-0"
-            title="Trading Control Menu"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#141b27]/85 hover:bg-[#1b2435] border border-white/10 flex items-center justify-center text-slate-200 hover:text-white transition-all active:scale-95 cursor-pointer shrink-0 shadow-md relative"
+            title={isMenuUnlocked ? 'Quotex Feature Menu (Unlocked)' : 'Menu is Locked (PIN: 1234)'}
           >
             <Menu className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+            {!isMenuUnlocked && (
+              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 border border-[#0a0d14] flex items-center justify-center shadow-xs">
+                <Lock className="w-2 h-2 text-slate-950 stroke-[3]" />
+              </span>
+            )}
+          </button>
+
+          {/* Quick Trade Mode Switcher: Quick Trade (Binary) / Forex Trading ("aur ma forex trading option jis ma forex trading be kar saka ok") */}
+          <button
+            onClick={() => {
+              const nextMode = tradingPlatformMode === 'FOREX' ? 'BINARY' : 'FOREX';
+              setTradingPlatformMode(nextMode);
+            }}
+            className={`px-2 py-1.5 rounded-xl text-[10px] font-black border flex items-center gap-1 cursor-pointer transition-all active:scale-95 shrink-0 shadow-sm ${
+              tradingPlatformMode === 'FOREX'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                : 'bg-[#141b27]/85 hover:bg-[#1a2436] text-emerald-400 border-emerald-500/30'
+            }`}
+            title="Switch Trading Mode (Quick Trade / Forex)"
+          >
+            {tradingPlatformMode === 'FOREX' ? (
+              <>
+                <Globe className="w-3 h-3 text-cyan-300" />
+                <span className="tracking-wide">FOREX</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3 h-3 text-emerald-400" />
+                <span className="tracking-wide">TRADE</span>
+              </>
+            )}
           </button>
 
           {/* Unified Account + Full Balance Pill — Never truncates LIVE or DEMO amount */}
@@ -443,16 +562,27 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                 <div className="text-sm font-extrabold text-white flex items-center gap-1.5">
                   <span>Quotex Feature Menu</span>
                   <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-1.5 py-0.2 rounded font-black">
-                    PRO
+                    ALL FEATURES INTACT
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400">
-                  Tap any feature below to open or close its panel
+                  Forex, Binary, AI Signals, Tournaments & Tools
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setIsMenuUnlocked(false);
+                  setShowThreeLineMenu(false);
+                }}
+                className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 cursor-pointer transition-colors flex items-center gap-1 text-[10px] font-bold"
+                title="Lock Menu with PIN 1234"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Lock</span>
+              </button>
               {openPanelId !== null && (
                 <button
                   onClick={() => setOpenPanelId(null)}
@@ -525,8 +655,417 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
             </div>
           </div>
 
+          {/* Quick Filter Categories */}
+          <div className="px-3 py-1.5 bg-[#090d15] border-b border-[#182335] flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0">
+            {(
+              [
+                { id: 'ALL', label: 'All (15)' },
+                { id: 'FOREX', label: 'Forex 🌐' },
+                { id: 'TRADING', label: 'Trading & AI' },
+                { id: 'TOOLS', label: 'Tools & Chart' },
+                { id: 'CASHIER', label: 'Cashier & Stats' }
+              ] as const
+            ).map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setMenuFilterCategory(cat.id)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                  menuFilterCategory === cat.id
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50'
+                    : 'bg-[#121927] text-slate-400 hover:text-white border border-white/5'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
           {/* UP-TO-DOWN SEPARATE COLLAPSIBLE FEATURE PANELS ("Sara meanu feature ko alada alada meanu ma rakna up to down ok") */}
           <div className="p-3 overflow-y-auto flex-1 space-y-2 text-xs overscroll-contain">
+            {/* =====================================================================
+                PANEL: Forex Trading Mode & Real-Time Trading ("aur ma forex trading option jis ma forex trading be kar saka ok")
+               ===================================================================== */}
+            {(menuFilterCategory === 'ALL' || menuFilterCategory === 'FOREX') && (
+              <div className="bg-[#101726] border border-blue-500/40 rounded-xl overflow-hidden shadow-lg">
+                <div
+                  onClick={() => togglePanel('forex')}
+                  className="px-3.5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#152035] transition-colors bg-gradient-to-r from-blue-950/40 to-transparent"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-400/30">
+                      <Globe className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-extrabold text-white text-xs flex items-center gap-1.5">
+                        <span>Forex Trading (CFD / Multipliers)</span>
+                        <span className="text-[8px] bg-blue-500/30 text-cyan-300 border border-blue-400/40 px-1 py-0.2 rounded font-black uppercase">
+                          NEW
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                        <span className="text-cyan-300 font-bold">{forexPositions.length} Open Positions</span>
+                        <span>•</span>
+                        <span>Multipliers up to x500</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTradingPlatformMode(tradingPlatformMode === 'FOREX' ? 'BINARY' : 'FOREX');
+                      }}
+                      className={`px-2 py-0.5 rounded text-[10px] font-black cursor-pointer transition-colors ${
+                        tradingPlatformMode === 'FOREX'
+                          ? 'bg-blue-500 text-white shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+                          : 'bg-[#182338] text-slate-300 hover:text-white border border-white/10'
+                      }`}
+                    >
+                      {tradingPlatformMode === 'FOREX' ? 'FOREX ON' : 'ENABLE'}
+                    </span>
+                    {openPanelId === 'forex' ? (
+                      <ChevronUp className="w-4 h-4 text-cyan-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                {openPanelId === 'forex' && (
+                  <div className="p-3.5 space-y-3 border-t border-[#1d2b42] bg-[#0c121e]">
+                    {/* Platform Mode Selector */}
+                    <div className="bg-[#121927] p-2 rounded-xl border border-white/10 flex items-center gap-1.5">
+                      <button
+                        onClick={() => setTradingPlatformMode('BINARY')}
+                        className={`flex-1 py-1.5 rounded-lg text-[10.5px] font-black cursor-pointer transition-all flex items-center justify-center gap-1 ${
+                          tradingPlatformMode === 'BINARY'
+                            ? 'bg-emerald-500 text-slate-950 shadow-md'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Quick Trade (Binary)</span>
+                      </button>
+                      <button
+                        onClick={() => setTradingPlatformMode('FOREX')}
+                        className={`flex-1 py-1.5 rounded-lg text-[10.5px] font-black cursor-pointer transition-all flex items-center justify-center gap-1 ${
+                          tradingPlatformMode === 'FOREX'
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>Forex Mode</span>
+                      </button>
+                    </div>
+
+                    {/* Pair & Current Price */}
+                    <div className="bg-[#121927] p-2.5 rounded-xl border border-white/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Forex Asset Pair</span>
+                        <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                          Spread: 0.8 pips • Real-Time
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {assets.slice(0, 6).map((ast) => (
+                          <button
+                            key={ast.id}
+                            onClick={() => setActiveAsset(ast)}
+                            className={`px-2 py-1.5 rounded-lg text-[10px] font-black cursor-pointer transition-colors text-left flex flex-col ${
+                              activeAsset.id === ast.id
+                                ? 'bg-blue-600 text-white border border-blue-400 shadow-sm'
+                                : 'bg-[#182337] text-slate-300 hover:text-white border border-white/5'
+                            }`}
+                          >
+                            <span className="truncate">{ast.symbol}</span>
+                            <span className="font-mono text-[9px] opacity-80">
+                              {formatPrice(ast.currentPrice, ast.decimalPlaces)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Margin Collateral */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Margin Collateral ($)</span>
+                        <span className="text-[10px] text-slate-400">
+                          Balance: <span className="text-white font-mono font-bold">${accountType === 'REAL' ? realBalance.toFixed(2) : demoBalance.toFixed(2)}</span>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1">
+                        {[10, 25, 50, 100].map((amt) => (
+                          <button
+                            key={amt}
+                            onClick={() => setForexMargin(amt)}
+                            className={`py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
+                              forexMargin === amt
+                                ? 'bg-cyan-500 text-slate-950 font-black'
+                                : 'bg-[#162133] text-slate-300 hover:text-white border border-white/5'
+                            }`}
+                          >
+                            ${amt}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="number"
+                        value={forexMargin}
+                        onChange={(e) => setForexMargin(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-full bg-[#162133] border border-[#233149] rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-hidden focus:border-cyan-400"
+                        placeholder="Custom Margin ($)"
+                      />
+                    </div>
+
+                    {/* Leverage Multiplier */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Leverage Multiplier</span>
+                        <span className="text-[10px] text-amber-300 font-mono font-bold">
+                          Trade Volume: ${(forexMargin * forexLeverage).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1">
+                        {[20, 50, 100, 200, 500].map((lev) => (
+                          <button
+                            key={lev}
+                            onClick={() => setForexLeverage(lev)}
+                            className={`py-1 rounded-lg text-[10.5px] font-black cursor-pointer ${
+                              forexLeverage === lev
+                                ? 'bg-amber-400 text-slate-950'
+                                : 'bg-[#162133] text-slate-300 hover:text-white border border-white/5'
+                            }`}
+                          >
+                            {lev}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Take Profit & Stop Loss */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-[#121927] p-2 rounded-xl border border-white/10 space-y-1">
+                        <div className="text-[9px] uppercase font-bold text-emerald-400">Take Profit (TP)</div>
+                        <div className="flex items-center gap-1">
+                          {[25, 50, 100].map((p) => (
+                            <button
+                              key={p}
+                              onClick={() => setForexTpPercent(p)}
+                              className={`flex-1 py-0.5 rounded text-[9px] font-bold cursor-pointer ${
+                                forexTpPercent === p
+                                  ? 'bg-emerald-500 text-slate-950'
+                                  : 'bg-[#1a2538] text-slate-300 hover:text-white'
+                              }`}
+                            >
+                              +{p}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-[#121927] p-2 rounded-xl border border-white/10 space-y-1">
+                        <div className="text-[9px] uppercase font-bold text-rose-400">Stop Loss (SL)</div>
+                        <div className="flex items-center gap-1">
+                          {[20, 30, 50].map((p) => (
+                            <button
+                              key={p}
+                              onClick={() => setForexSlPercent(p)}
+                              className={`flex-1 py-0.5 rounded text-[9px] font-bold cursor-pointer ${
+                                forexSlPercent === p
+                                  ? 'bg-rose-500 text-white'
+                                  : 'bg-[#1a2538] text-slate-300 hover:text-white'
+                              }`}
+                            >
+                              -{p}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* BUY / SELL Action Buttons */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          const pip = Math.pow(10, -activeAsset.decimalPlaces);
+                          const tpPrice = Number((activeAsset.currentPrice + pip * (forexTpPercent * 10)).toFixed(activeAsset.decimalPlaces));
+                          const slPrice = Number((activeAsset.currentPrice - pip * (forexSlPercent * 10)).toFixed(activeAsset.decimalPlaces));
+                          const ok = openForexPosition('BUY', forexMargin, forexLeverage, tpPrice, slPrice);
+                          if (ok) {
+                            setForexMessage(`BUY order opened on ${activeAsset.symbol} ($${forexMargin} @ ${forexLeverage}x)!`);
+                            setTimeout(() => setForexMessage(null), 3000);
+                          } else {
+                            setForexMessage('Insufficient balance for margin!');
+                            setTimeout(() => setForexMessage(null), 3000);
+                          }
+                        }}
+                        className="py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-black text-xs flex flex-col items-center justify-center cursor-pointer shadow-lg active:scale-95"
+                      >
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>BUY / LONG</span>
+                        </div>
+                        <span className="text-[10px] font-mono opacity-90">
+                          {formatPrice(activeAsset.currentPrice, activeAsset.decimalPlaces)}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          const pip = Math.pow(10, -activeAsset.decimalPlaces);
+                          const tpPrice = Number((activeAsset.currentPrice - pip * (forexTpPercent * 10)).toFixed(activeAsset.decimalPlaces));
+                          const slPrice = Number((activeAsset.currentPrice + pip * (forexSlPercent * 10)).toFixed(activeAsset.decimalPlaces));
+                          const ok = openForexPosition('SELL', forexMargin, forexLeverage, tpPrice, slPrice);
+                          if (ok) {
+                            setForexMessage(`SELL order opened on ${activeAsset.symbol} ($${forexMargin} @ ${forexLeverage}x)!`);
+                            setTimeout(() => setForexMessage(null), 3000);
+                          } else {
+                            setForexMessage('Insufficient balance for margin!');
+                            setTimeout(() => setForexMessage(null), 3000);
+                          }
+                        }}
+                        className="py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 text-white font-black text-xs flex flex-col items-center justify-center cursor-pointer shadow-lg active:scale-95"
+                      >
+                        <div className="flex items-center gap-1">
+                          <TrendingDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>SELL / SHORT</span>
+                        </div>
+                        <span className="text-[10px] font-mono opacity-90">
+                          {formatPrice(activeAsset.currentPrice, activeAsset.decimalPlaces)}
+                        </span>
+                      </button>
+                    </div>
+
+                    {forexMessage && (
+                      <div className="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/40 p-1.5 rounded-lg border border-cyan-500/30">
+                        {forexMessage}
+                      </div>
+                    )}
+
+                    {/* Open Forex Positions List */}
+                    <div className="pt-2 border-t border-white/10 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">
+                          Open Forex Positions ({forexPositions.length})
+                        </span>
+                        {forexPositions.length > 0 && (
+                          <span className="text-[9px] text-cyan-400 animate-pulse font-bold">
+                            Live P&L Tracking
+                          </span>
+                        )}
+                      </div>
+
+                      {forexPositions.length === 0 ? (
+                        <div className="text-center py-3 text-[11px] text-slate-400 bg-[#121927] rounded-xl border border-white/5">
+                          No open Forex positions. Click BUY or SELL above to trade Forex!
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {forexPositions.map((pos) => {
+                            const isProfit = pos.pnl >= 0;
+                            return (
+                              <div
+                                key={pos.id}
+                                className="bg-[#121927] p-2.5 rounded-xl border border-white/10 flex items-center justify-between gap-2 shadow-sm"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${
+                                        pos.direction === 'BUY'
+                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-400/40'
+                                          : 'bg-rose-500/20 text-rose-400 border border-rose-400/40'
+                                      }`}
+                                    >
+                                      {pos.direction}
+                                    </span>
+                                    <span className="font-extrabold text-white text-xs">{pos.assetSymbol}</span>
+                                    <span className="text-[9px] text-slate-400 font-mono">
+                                      {pos.leverage}x
+                                    </span>
+                                  </div>
+                                  <div className="text-[9px] text-slate-400 font-mono mt-0.5">
+                                    Open: {formatPrice(pos.openPrice, 4)} → Live: {formatPrice(pos.currentPrice, 4)}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <div className="text-right">
+                                    <div
+                                      className={`text-xs font-black font-mono-num ${
+                                        isProfit ? 'text-[#00e599]' : 'text-[#ff3355]'
+                                      }`}
+                                    >
+                                      {isProfit ? `+$${pos.pnl.toFixed(2)}` : `-$${Math.abs(pos.pnl).toFixed(2)}`}
+                                    </div>
+                                    <div
+                                      className={`text-[9px] font-bold ${
+                                        isProfit ? 'text-emerald-400' : 'text-rose-400'
+                                      }`}
+                                    >
+                                      {isProfit ? `+${pos.pnlPercent}%` : `${pos.pnlPercent}%`}
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    onClick={() => closeForexPosition(pos.id)}
+                                    className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-400/40 font-bold text-[9px] cursor-pointer transition-colors"
+                                    title="Close Position Now"
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Forex Closed History */}
+                    {forexHistory.length > 0 && (
+                      <div className="pt-2 border-t border-white/10 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">
+                            Closed History ({forexHistory.length})
+                          </span>
+                          <button
+                            onClick={clearForexHistory}
+                            className="text-[9px] text-slate-400 hover:text-rose-400 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                          {forexHistory.slice(0, 5).map((h) => {
+                            const isWin = h.pnl >= 0;
+                            return (
+                              <div
+                                key={h.id}
+                                className="bg-[#0e1420] px-2 py-1 rounded-lg border border-white/5 flex items-center justify-between text-[10px]"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`font-bold ${h.direction === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {h.direction}
+                                  </span>
+                                  <span className="text-white">{h.assetSymbol}</span>
+                                </div>
+                                <div className={`font-mono font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {isWin ? `+$${h.pnl.toFixed(2)}` : `-$${Math.abs(h.pnl).toFixed(2)}`}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             {/* =====================================================================
                 PANEL 1: Account & Live Balance Control
                ===================================================================== */}
@@ -795,6 +1334,255 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                 </div>
               )}
             </div>
+
+            {/* =====================================================================
+                PANEL: Quotex AI Live Signals ("meanu ka all feature wapasa lao")
+               ===================================================================== */}
+            {(menuFilterCategory === 'ALL' || menuFilterCategory === 'TRADING') && (
+              <div className="bg-[#121926] border border-cyan-500/30 rounded-xl overflow-hidden shadow-sm">
+                <div
+                  onClick={() => togglePanel('signals')}
+                  className="px-3.5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#162030] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/30">
+                      <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <span>Quotex Live AI Signals</span>
+                        <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-black">
+                          89-94% ACCURACY
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Real-time AI algorithmic trade predictions • 1-Click Copy
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {openPanelId === 'signals' ? (
+                      <ChevronUp className="w-4 h-4 text-cyan-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                {openPanelId === 'signals' && (
+                  <div className="p-3 space-y-2 border-t border-[#1e2a3c] bg-[#0c121d]">
+                    <div className="text-[10px] text-slate-300">
+                      Tap <span className="text-cyan-300 font-bold">Copy Signal</span> to automatically switch asset and ready the trade!
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {[
+                        { id: 'SIG-1', symbol: 'EUR/USD OTC', dir: 'UP', accuracy: '94%', tf: '1M', strength: 'Strong Buy' },
+                        { id: 'SIG-2', symbol: 'GBP/USD OTC', dir: 'UP', accuracy: '91%', tf: '1M', strength: 'Strong Buy' },
+                        { id: 'SIG-3', symbol: 'USD/JPY OTC', dir: 'DOWN', accuracy: '89%', tf: '2M', strength: 'Strong Sell' },
+                        { id: 'SIG-4', symbol: 'Crypto BTC', dir: 'UP', accuracy: '92%', tf: '1M', strength: 'Bullish' }
+                      ].map((sig) => (
+                        <div
+                          key={sig.id}
+                          className="bg-[#141d2c] p-2.5 rounded-xl border border-white/5 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-extrabold text-white text-xs">{sig.symbol}</span>
+                              <span className="text-[9px] bg-slate-800 text-slate-300 px-1 py-0.2 rounded font-mono">
+                                {sig.tf}
+                              </span>
+                            </div>
+                            <div className="text-[9px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                              <span className="text-emerald-400 font-bold">{sig.accuracy} Accuracy</span>
+                              <span>•</span>
+                              <span className={sig.dir === 'UP' ? 'text-emerald-300' : 'text-rose-300'}>
+                                {sig.strength}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+                                sig.dir === 'UP'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                              }`}
+                            >
+                              {sig.dir}
+                            </span>
+                            <button
+                              onClick={() => {
+                                const matched = assets.find((a) => a.symbol === sig.symbol) || assets[0];
+                                setActiveAsset(matched);
+                                setCopiedSignalId(sig.id);
+                                setTimeout(() => setCopiedSignalId(null), 2500);
+                              }}
+                              className="px-2 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 font-bold text-[10px] cursor-pointer transition-colors"
+                            >
+                              {copiedSignalId === sig.id ? 'Copied ✓' : 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* =====================================================================
+                PANEL: Quotex Tournaments & Contests ("meanu ka all feature wapasa lao")
+               ===================================================================== */}
+            {(menuFilterCategory === 'ALL' || menuFilterCategory === 'TRADING') && (
+              <div className="bg-[#121926] border border-amber-500/30 rounded-xl overflow-hidden shadow-sm">
+                <div
+                  onClick={() => togglePanel('tournaments')}
+                  className="px-3.5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#162030] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                      <Trophy className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <span>Quotex Tournaments</span>
+                        <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded font-black">
+                          $125,000+ PRIZES
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Compete with top traders & win cash prizes
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {openPanelId === 'tournaments' ? (
+                      <ChevronUp className="w-4 h-4 text-cyan-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                {openPanelId === 'tournaments' && (
+                  <div className="p-3 space-y-2 border-t border-[#1e2a3c] bg-[#0c121d]">
+                    <div className="space-y-1.5">
+                      {[
+                        { title: 'Daily Free Tournament', prize: '$1,000', fee: 'FREE', active: '2,481 Traders', status: 'ACTIVE' },
+                        { title: 'Weekend Pro Challenge', prize: '$25,000', fee: '$10', active: '840 Traders', status: 'REGISTER' },
+                        { title: 'Grand Master Championship', prize: '$100,000', fee: '$50', active: '512 Traders', status: 'UPCOMING' }
+                      ].map((trn, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-[#141d2c] p-2.5 rounded-xl border border-white/5 flex items-center justify-between gap-2"
+                        >
+                          <div>
+                            <div className="font-bold text-white text-xs">{trn.title}</div>
+                            <div className="text-[9px] text-slate-400 mt-0.5 flex items-center gap-2">
+                              <span className="text-amber-400 font-extrabold">{trn.prize} Prize</span>
+                              <span>•</span>
+                              <span>Fee: {trn.fee}</span>
+                              <span>•</span>
+                              <span>{trn.active}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              alert(`Successfully joined ${trn.title}! Your tournament balance is ready.`);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] cursor-pointer transition-colors shrink-0"
+                          >
+                            {trn.status === 'ACTIVE' ? 'Participate' : 'Join'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* =====================================================================
+                PANEL: Quotex Market & Promo Store ("meanu ka all feature wapasa lao")
+               ===================================================================== */}
+            {(menuFilterCategory === 'ALL' || menuFilterCategory === 'CASHIER') && (
+              <div className="bg-[#121926] border border-purple-500/30 rounded-xl overflow-hidden shadow-sm">
+                <div
+                  onClick={() => togglePanel('market')}
+                  className="px-3.5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#162030] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30">
+                      <Gift className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <span>Market & Promo Codes</span>
+                        <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1 rounded font-black">
+                          PROMOS ACTIVE
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Deposit bonuses, risk-free trades & gems rewards
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {openPanelId === 'market' ? (
+                      <ChevronUp className="w-4 h-4 text-cyan-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                {openPanelId === 'market' && (
+                  <div className="p-3 space-y-2.5 border-t border-[#1e2a3c] bg-[#0c121d]">
+                    <div className="text-[10px] text-slate-300">
+                      Active promotional codes to apply on deposit for bonus funds:
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {[
+                        { code: 'BONUS50', desc: '+50% Extra Balance on Any Deposit', bonus: '+50%' },
+                        { code: 'QUOTEX100', desc: '100% 2X Capital Double Match', bonus: '+100%' },
+                        { code: 'VIP30', desc: '+30% Instant Real VIP Cashback', bonus: '+30%' }
+                      ].map((pr) => (
+                        <div
+                          key={pr.code}
+                          className="bg-[#141d2c] p-2 rounded-xl border border-white/5 flex items-center justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-black text-amber-300 text-xs">{pr.code}</span>
+                              <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 rounded font-bold">
+                                {pr.bonus}
+                              </span>
+                            </div>
+                            <div className="text-[9px] text-slate-400">{pr.desc}</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard?.writeText(pr.code);
+                              setShowThreeLineMenu(false);
+                              onOpenDeposit();
+                            }}
+                            className="px-2 py-1 rounded-lg bg-[#00e599] hover:bg-[#00f7a5] text-slate-950 font-black text-[10px] cursor-pointer"
+                          >
+                            Apply Code
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* =====================================================================
                 PANEL 3: Chart Buttons (Eye, Bag, Pen Tool & Zoom) ON/OFF
@@ -1832,6 +2620,85 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
                 </div>
               )}
             </div>
+
+            {/* =====================================================================
+                PANEL: Quotex 24/7 Help & Support Desk ("meanu ka all feature wapasa lao")
+               ===================================================================== */}
+            {(menuFilterCategory === 'ALL' || menuFilterCategory === 'TOOLS') && (
+              <div className="bg-[#121926] border border-emerald-500/30 rounded-xl overflow-hidden shadow-sm">
+                <div
+                  onClick={() => togglePanel('support')}
+                  className="px-3.5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#162030] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                      <HelpCircle className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <span>24/7 Support & Verification</span>
+                        <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-black">
+                          ONLINE
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Live chat desk, KYC status & trading FAQ
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {openPanelId === 'support' ? (
+                      <ChevronUp className="w-4 h-4 text-cyan-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                {openPanelId === 'support' && (
+                  <div className="p-3 space-y-2.5 border-t border-[#1e2a3c] bg-[#0c121d]">
+                    <div className="bg-[#141d2c] p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+                        <div>
+                          <div className="text-white font-extrabold text-xs">Profile Status: Verified ✓</div>
+                          <div className="text-[9px] text-slate-400">Level 3 VIP Tier • Unlimited Withdrawals</div>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[9px]">
+                        ACTIVE
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Quick Assistance</div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => {
+                            if (onOpenSupport) onOpenSupport();
+                            else alert('24/7 Support Agent is Online! You can submit inquiries anytime.');
+                          }}
+                          className="py-2 px-2.5 rounded-lg bg-[#182337] hover:bg-[#202f4a] text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer border border-cyan-500/30"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Live Chat</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            alert('Quotex Platform Help: Instant execution, 0% fees on deposits/withdrawals, 100+ Indicators, and 24/7 OTC trading.');
+                          }}
+                          className="py-2 px-2.5 rounded-lg bg-[#182337] hover:bg-[#202f4a] text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer border border-white/10"
+                        >
+                          <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Trading FAQ</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Drawer Sticky Footer */}
@@ -1845,6 +2712,149 @@ export const QuotexMobileTopBar: React.FC<QuotexMobileTopBarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 4. Glass PIN Lock Modal with PIN 1234 ("aur meanu ma lock lagao 1234 ok fix") */}
+      {showMenuPinLock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 select-none animate-fadeIn">
+          {/* Dark Glass Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity"
+            onClick={() => setShowMenuPinLock(false)}
+          />
+
+          {/* Glass Dialog Card */}
+          <div
+            className={`relative w-full max-w-[330px] bg-gradient-to-b from-[#162032]/95 via-[#101726]/95 to-[#0b101a]/98 border rounded-2xl p-5 shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl z-10 transition-all ${
+              pinError
+                ? 'border-rose-500/80 shadow-[0_0_30px_rgba(244,63,94,0.4)]'
+                : pinSuccess
+                ? 'border-emerald-400/80 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
+                : 'border-white/15'
+            }`}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowMenuPinLock(false)}
+              className="absolute top-3.5 right-3.5 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="flex flex-col items-center text-center">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2.5 shadow-lg transition-all ${
+                  pinSuccess
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/50'
+                    : pinError
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-400/50'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-400/50'
+                }`}
+              >
+                {pinSuccess ? (
+                  <ShieldCheck className="w-6 h-6 stroke-[2.2]" />
+                ) : (
+                  <Lock className="w-6 h-6 stroke-[2.2]" />
+                )}
+              </div>
+
+              <h3 className="text-base font-black text-white tracking-wide flex items-center gap-1.5">
+                <span>Menu Security Lock</span>
+                <span className="text-[9px] bg-emerald-500/25 text-emerald-300 border border-emerald-400/40 px-1.5 py-0.2 rounded font-black">
+                  ALL 15 FEATURES INTACT
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-300 mt-1 font-medium">
+                Enter PIN <span className="text-cyan-300 font-bold font-mono">1234</span> to access all 15 Quotex menu features
+              </p>
+
+              {/* 4 Digit Dots */}
+              <div className="flex items-center gap-3 my-3.5">
+                {[0, 1, 2, 3].map((idx) => {
+                  const isFilled = menuPinInput.length > idx;
+                  return (
+                    <div
+                      key={idx}
+                      className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
+                        pinSuccess
+                          ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)] scale-110'
+                          : pinError
+                          ? 'bg-rose-400 shadow-[0_0_12px_rgba(251,113,133,0.8)] scale-110'
+                          : isFilled
+                          ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)] scale-110'
+                          : 'bg-[#1e2a3c] border border-white/20'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Status message */}
+              <div className="h-4 text-[10.5px] font-bold text-center">
+                {pinError ? (
+                  <span className="text-rose-400">Incorrect PIN! Password is 1234</span>
+                ) : pinSuccess ? (
+                  <span className="text-emerald-400">PIN Verified! Opening Menu...</span>
+                ) : (
+                  <span className="text-slate-400 text-[10px]">Enter 4 digits using keypad</span>
+                )}
+              </div>
+            </div>
+
+            {/* Numeric Keypad Grid */}
+            <div className="grid grid-cols-3 gap-1.5 mt-3">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                <button
+                  key={digit}
+                  onClick={() => handlePinDigit(digit)}
+                  className="h-10 rounded-xl bg-[#141d2c]/80 hover:bg-[#1f2b40] active:scale-95 border border-white/10 text-white font-mono-num font-extrabold text-base transition-all flex items-center justify-center shadow-md cursor-pointer"
+                >
+                  {digit}
+                </button>
+              ))}
+              <button
+                onClick={handlePinClear}
+                className="h-10 rounded-xl bg-[#141d2c]/60 hover:bg-rose-950/40 active:scale-95 border border-white/10 text-rose-300 font-bold text-xs transition-all flex items-center justify-center cursor-pointer"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => handlePinDigit('0')}
+                className="h-10 rounded-xl bg-[#141d2c]/80 hover:bg-[#1f2b40] active:scale-95 border border-white/10 text-white font-mono-num font-extrabold text-base transition-all flex items-center justify-center shadow-md cursor-pointer"
+              >
+                0
+              </button>
+              <button
+                onClick={handlePinBackspace}
+                className="h-10 rounded-xl bg-[#141d2c]/60 hover:bg-[#1f2b40] active:scale-95 border border-white/10 text-slate-300 hover:text-white font-bold text-xs transition-all flex items-center justify-center cursor-pointer"
+                title="Backspace"
+              >
+                ⌫
+              </button>
+            </div>
+
+            {/* Quick 1234 auto-fill helper button for convenience */}
+            <button
+              onClick={() => {
+                setMenuPinInput('1234');
+                setPinSuccess(true);
+                setTimeout(() => {
+                  setIsMenuUnlocked(true);
+                  setShowMenuPinLock(false);
+                  setMenuPinInput('');
+                  setPinSuccess(false);
+                  setOpenPanelId(null);
+                  setShowThreeLineMenu(true);
+                }, 350);
+              }}
+              className="w-full mt-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-cyan-300 font-bold text-[11px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Unlock with PIN: 1234</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

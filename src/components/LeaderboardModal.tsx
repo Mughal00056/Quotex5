@@ -73,12 +73,19 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
     setCustomLeaderboardProfit,
     customLeaderboardRank,
     setCustomLeaderboardRank,
-    logoImageUrl
+    logoImageUrl,
+    realBalance,
+    demoBalance,
+    accountType
   } = useTrading();
 
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showRatingInfo, setShowRatingInfo] = useState(false);
   const [rotationSeed, setRotationSeed] = useState<number>(() => Date.now());
+
+  // Check if user has zero balance ("and jab hum apne balance na hu tu leaderboard ma top par na raha fix karo")
+  const activeBalance = accountType === 'REAL' ? realBalance : demoBalance;
+  const hasNoBalance = activeBalance <= 0;
 
   // Every time the Leaderboard opens or tradeHistory changes, rotate traders ("leaderboard ma har bar banda change ho")
   useEffect(() => {
@@ -141,16 +148,18 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
 
   // Calculate user's live profit from tradeHistory so every trade win immediately updates profit & position
   const calculatedNetProfit = tradeHistory.reduce((sum, t) => sum + (t.actualProfit || 0), 0);
-  const userProfit =
-    customLeaderboardProfit !== null
-      ? customLeaderboardProfit
-      : tradeHistory.length > 0
-      ? Number(calculatedNetProfit.toFixed(2))
-      : -5.21;
+  const userProfit = hasNoBalance
+    ? -5.21
+    : customLeaderboardProfit !== null
+    ? customLeaderboardProfit
+    : tradeHistory.length > 0
+    ? Number(calculatedNetProfit.toFixed(2))
+    : -5.21;
 
-  // Combine user into the leaderboard if their profit qualifies for the top 15
+  // Combine user into the leaderboard ONLY if user actually has balance and qualifies!
+  // ("and jab hum apne balance na hu tu leaderboard ma top par na raha fix karo")
   const allEntries: LeaderboardEntry[] = [...dynamicTraders];
-  if (userProfit >= dynamicTraders[dynamicTraders.length - 1].profit) {
+  if (!hasNoBalance && userProfit >= dynamicTraders[dynamicTraders.length - 1].profit) {
     allEntries.push({
       name: traderName || 'YA TRADER',
       flag: traderFlag || '🇵🇰',
@@ -165,8 +174,12 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
   const rankedList = allEntries.slice(0, 15);
   const userIndexInTop = allEntries.findIndex((e) => e.isCurrentUser);
 
-  // Dynamically calculate user's position so every trade won visibly improves Your position
+  // Dynamically calculate user's position
+  // If user has NO balance, position is strictly #37,019 or unranked, never in top ranks!
   const computeDynamicRank = (profit: number) => {
+    if (hasNoBalance) {
+      return 37019;
+    }
     if (userIndexInTop !== -1) {
       return userIndexInTop + 1;
     }
@@ -181,18 +194,20 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
     return Math.max(16, Math.round(37019 * Math.pow(1 - ratio, 2.6)));
   };
 
-  const displayedPosition =
-    customLeaderboardRank !== null
-      ? customLeaderboardRank
-      : computeDynamicRank(userProfit);
+  const displayedPosition = hasNoBalance
+    ? 37019
+    : customLeaderboardRank !== null
+    ? customLeaderboardRank
+    : computeDynamicRank(userProfit);
 
   // Progress bar percentage for user's top card (matching screenshot green bar)
-  const progressPercent =
-    userIndexInTop === 0
-      ? 100
-      : userProfit > 0
-      ? Math.min(95, Math.max(38, Math.floor((userProfit / 30000) * 100) + 35))
-      : 36;
+  const progressPercent = hasNoBalance
+    ? 0
+    : userIndexInTop === 0
+    ? 100
+    : userProfit > 0
+    ? Math.min(95, Math.max(38, Math.floor((userProfit / 30000) * 100) + 35))
+    : 36;
 
   // Format user profit on top right of card (e.g. "-5.21$" or "$1,250.00")
   const formatUserCardProfit = (val: number) => {
@@ -328,48 +343,70 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
 
         {/* Main Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-3.5 pb-4">
-          {/* 2. User Position Card (Matches screenshot: Flag + YA TRADER, -5.21$, Green progress bar, Your position: 37019) */}
-          <div className="bg-[#1b202e] rounded-lg px-3.5 py-3 shadow-md">
+          {/* 2. User Position Card with Glass UI */}
+          <div className="bg-gradient-to-b from-[#192233]/90 to-[#121927]/90 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3.5 shadow-xl">
             {/* Top Row: Flag + Name on left, Profit/Loss on right */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="flex items-center -space-x-1 shrink-0">
-                  <div className="w-6 h-6 rounded-full bg-[#252d3f] border border-[#121622] flex items-center justify-center text-xs shadow-inner overflow-hidden z-10">
+                  <div className="w-6 h-6 rounded-full bg-[#252d3f] border border-white/20 flex items-center justify-center text-xs shadow-inner overflow-hidden z-10">
                     <span>{traderFlag || '🇵🇰'}</span>
                   </div>
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 border border-[#121622] flex items-center justify-center text-slate-950 font-black text-[9px] shadow-sm">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-400 to-emerald-400 border border-white/20 flex items-center justify-center text-slate-950 font-black text-[9px] shadow-sm">
                     {(traderName || 'YA').slice(0, 2).toUpperCase()}
                   </div>
                 </div>
-                <span className="font-bold text-white text-sm tracking-wide">
-                  {traderName || 'YA TRADER'}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-extrabold text-white text-sm tracking-wide">
+                    {traderName || 'YA TRADER'}
+                  </span>
+                  {hasNoBalance && (
+                    <span className="text-[9.5px] font-bold text-amber-400">
+                      Balance: $0.00 (Unranked)
+                    </span>
+                  )}
+                </div>
               </div>
 
               <span
-                className={`font-mono-num font-bold text-sm ${
-                  userProfit < 0 ? 'text-[#ff4766]' : 'text-[#00c874]'
+                className={`font-mono-num font-extrabold text-sm ${
+                  hasNoBalance ? 'text-slate-400' : userProfit < 0 ? 'text-[#ff4766]' : 'text-[#00e599]'
                 }`}
               >
-                {formatUserCardProfit(userProfit)}
+                {hasNoBalance ? '$0.00' : formatUserCardProfit(userProfit)}
               </span>
             </div>
 
-            {/* Middle Progress Bar: Green bar on left, dark gray track on right */}
-            <div className="w-full h-[2px] bg-[#2a3142] my-2.5 rounded-full overflow-hidden">
+            {/* Middle Progress Bar: Green bar on left, dark track on right */}
+            <div className="w-full h-1 bg-[#232d40] my-2.5 rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#00c874] rounded-full transition-all duration-300"
+                className={`h-full rounded-full transition-all duration-300 ${
+                  hasNoBalance ? 'bg-slate-600' : 'bg-gradient-to-r from-emerald-500 to-[#00e599]'
+                }`}
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            {/* Bottom Row: Your position: 37019 */}
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-slate-400 font-medium">Your position:</span>
-              <span className="text-white font-extrabold font-mono-num">
-                {displayedPosition}
-              </span>
+            {/* Bottom Row: Your position */}
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-medium">Your position:</span>
+                <span className="text-white font-extrabold font-mono-num">
+                  {hasNoBalance ? '37019' : displayedPosition}
+                </span>
+              </div>
+              {hasNoBalance && (
+                <span className="text-[10px] text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+                  Zero Balance
+                </span>
+              )}
             </div>
+
+            {hasNoBalance && (
+              <div className="mt-2.5 text-[10.5px] text-amber-200/90 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg flex items-center justify-between">
+                <span>Deposit funds to rank on the live Top 15 Leaderboard</span>
+              </div>
+            )}
           </div>
 
           {/* 3. "How does this rating work?" Blue Box */}
