@@ -1002,9 +1002,9 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   setRealBalance((b) => Number((b + returnAmount).toFixed(2)));
                 }
                 if (tp.pnl >= 0) {
-                  sounds.playWinSound();
+                  sounds.playWin();
                 } else {
-                  sounds.playLoseSound();
+                  sounds.playLoss();
                 }
               });
             }
@@ -1437,9 +1437,9 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setForexHistory((prev) => [closedPos, ...prev]);
 
       if (finalPnl >= 0) {
-        sounds.playWinSound();
+        sounds.playWin();
       } else {
-        sounds.playLoseSound();
+        sounds.playLoss();
       }
     },
     []
